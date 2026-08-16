@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 仅高亮当前选中的时间分段。 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:state_enabled="true"
+        android:state_selected="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#331976D2" />
+            <stroke
+                android:width="1dp"
+                android:color="#1976D2" />
+            <corners android:radius="3dp" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#00FFFFFF" />
+        </shape>
+    </item>
+</selector>

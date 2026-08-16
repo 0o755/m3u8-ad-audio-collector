@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 旧版 Android 通过 FileProvider 分享 Download 中的规则文件。 -->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <external-path name="rule_exports" path="Download/m3u8-ad-audio/" />
+</paths>

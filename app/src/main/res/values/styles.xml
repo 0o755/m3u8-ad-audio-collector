@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 采集页统一使用紧凑控件尺寸，保证小屏单手操作时仍清晰对齐。 -->
+<resources>
+    <style name="CompactActionButton">
+        <item name="android:includeFontPadding">false</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:paddingStart">4dp</item>
+        <item name="android:paddingTop">0dp</item>
+        <item name="android:paddingEnd">4dp</item>
+        <item name="android:paddingBottom">0dp</item>
+        <item name="android:textSize">13sp</item>
+    </style>
+
+    <style name="CompactStepperButton" parent="CompactActionButton">
+        <item name="android:layout_width">34dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:textSize">17sp</item>
+    </style>
+
+    <style name="CompactPreviewButton">
+        <item name="android:layout_width">36dp</item>
+        <item name="android:layout_height">36dp</item>
+        <item name="android:layout_marginStart">3dp</item>
+        <item name="android:background">?attr/selectableItemBackground</item>
+        <item name="android:padding">8dp</item>
+    </style>
+
+    <style name="CompactFieldLabel">
+        <item name="android:layout_width">58dp</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:gravity">center_vertical</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="TimeComponentText">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">32dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:background">@drawable/time_component_background</item>
+        <item name="android:gravity">center</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:padding">0dp</item>
+        <item name="android:text">@string/time_component_unset</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="DurationComponentInput">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">34dp</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:background">@drawable/time_component_background</item>
+        <item name="android:enabled">false</item>
+        <item name="android:gravity">center</item>
+        <item name="android:inputType">number</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:padding">0dp</item>
+        <item name="android:selectAllOnFocus">true</item>
+        <item name="android:text">@string/time_component_unset</item>
+        <item name="android:textSize">15sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+
+    <style name="PositionComponentInput" parent="DurationComponentInput">
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="TimeSeparatorText">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">match_parent</item>
+        <item name="android:gravity">center</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+</resources>

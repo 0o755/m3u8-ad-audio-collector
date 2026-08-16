@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 规则测试覆盖层使用高对比颜色，保证视频画面上清晰可见。 -->
+<resources>
+    <color name="test_waiting">#FFEB3B</color>
+    <color name="test_ad">#FF5252</color>
+    <color name="test_complete">#40C4FF</color>
+    <color name="test_warning">#FFAB40</color>
+    <color name="confirmed_success">#18784B</color>
+</resources>

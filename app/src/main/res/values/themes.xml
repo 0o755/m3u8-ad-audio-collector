@@ -1,0 +1,8 @@
+<resources>
+    <!-- 主题参数与参考采集器一致，避免新底层改变用户可见样式。 -->
+    <style name="Theme.AdAudioCollector" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:colorAccent">@android:color/holo_blue_light</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+    </style>
+</resources>

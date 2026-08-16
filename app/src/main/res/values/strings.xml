@@ -1,0 +1,40 @@
+<resources>
+    <!-- 用户可见文案与参考 APK 保持一致，规则内容切换为 Probe rules-v1。 -->
+    <string name="app_name">广告音频采集器</string>
+    <string name="link_hint">粘贴 M3U8 播放链接</string>
+    <string name="play">播放</string>
+    <string name="auto_scan">自动扫描并采集</string>
+    <string name="auto_scanning">正在分析 M3U8...</string>
+    <string name="use_current_position">取当前进度</string>
+    <string name="start_position">开始</string>
+    <string name="end_position">结束</string>
+    <string name="derived_end_position">结束位置</string>
+    <string name="extract_fingerprint">提取广告指纹</string>
+    <string name="confirmed_rule_count">规则 %1$d</string>
+    <string name="saved_rule_list">规则列表</string>
+    <string name="saved_rule_list_count">规则列表（%1$d）</string>
+    <string name="saved_rule_list_title">已保存规则（%1$d）</string>
+    <string name="merge_rules">合并 rules.json</string>
+    <string name="rule_file_path">规则文件：%1$s</string>
+    <string name="extracting_fingerprint">正在提取...</string>
+    <string name="extraction_progress">正在提取... %1$d/%2$d 秒</string>
+    <string name="preview_start">播放微调后的广告开始位置</string>
+    <string name="preview_end">播放微调后的广告结束位置</string>
+    <string name="preview_duration">播放完整广告片段</string>
+    <string name="time_component_unset">--</string>
+    <string name="ad_duration">广告时长</string>
+    <string name="test_rule">测试规则</string>
+    <string name="test_auto_skip_short">自动跳过广告</string>
+    <string name="test_waiting">暂未触发广告</string>
+    <string name="test_ad_detected">广告中!!\n结束位置 %1$s</string>
+    <string name="skip_ad">跳过广告</string>
+    <string name="test_cannot_skip">已匹配广告\n结束位置 %1$s\n当前直播无法跳转</string>
+    <string name="test_seek_failed">已匹配广告\n结束位置 %1$s\n播放源时间轴异常，跳转失败</string>
+    <string name="confirm_rule">保存规则</string>
+    <string name="reject_rule">规则不正确</string>
+    <string name="export_rule">分享规则</string>
+    <string name="ready">粘贴链接并播放，设置广告开始位置和时长后提取指纹。</string>
+    <string name="help">采集帮助</string>
+    <string name="help_title">广告指纹采集说明</string>
+    <string name="help_message">快速采集：粘贴 M3U8 链接，点击“自动扫描并采集”，完成后测试并保存规则。\n\n手动采集：播放视频，设置广告开始位置和广告时长；可用播放图标预览边界，再依次提取、测试、保存。\n\n注意：开始位置应落在广告声音已出现的位置，时长必须避开正片音频。测试确认能在正确位置命中并跳过后再保存；播放卡顿时请等待缓冲完成后重试。</string>
+</resources>
