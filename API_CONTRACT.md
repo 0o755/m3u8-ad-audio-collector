@@ -49,7 +49,7 @@ interface CollectorGateway extends AutoCloseable {
 - `CaptureRange`：广告起点、广告总时长、锚点偏移与锚点时长；锚点必须完整位于广告内。
 - `Snapshot`：播放器位置/总时长、加载或工作流状态、规则数量与状态文字。
 - `AutomaticCaptureProgress`：扫描/采集阶段、当前候选序号、指纹百分比和候选范围；
-  UI 用该范围回填开始/结束，Gateway 同步控制可见播放器播放候选画面。
+  UI 用该范围回填开始/结束，Gateway 同步控制可见播放器分段快进候选画面。
 - `Match`：ruleId、广告起止位置、建议跳转位置、是否自动跳过。
 - `Failure`：稳定错误码、可重试标志和安全诊断文字。
 
@@ -92,6 +92,8 @@ interface CollectorGateway extends AutoCloseable {
 - 保存前完整校验 rules-v1；写入同目录临时文件并 fsync，再原子替换主文件。
 - 同 ID 的导入规则覆盖本地规则，不同 ID 追加；输出 revision 为
   `max(local.revision, incoming.revision) + 1`，规则顺序稳定。
+- 自动或手动采集草稿按锚点配置和四相位完整指纹去重；重复扫描更新稳定 ID 的草稿，
+  与已保存检测内容完全相同时不新增待保存项。
 - 导入包含任何旧 schema 或未知字段时整份拒绝，绝不静默迁移。
 
 ## Probe 公开 API 接线

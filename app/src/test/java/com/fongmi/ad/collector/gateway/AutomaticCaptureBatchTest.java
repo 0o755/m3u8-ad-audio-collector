@@ -32,6 +32,18 @@ public final class AutomaticCaptureBatchTest {
     }
 
     @Test
+    public void countsSuccessfulPendingRulesSeparatelyFromCandidates() {
+        AutomaticCaptureBatch batch = new AutomaticCaptureBatch(scanResult());
+
+        batch.accept(RuleDraftDeduplicator.Status.ADDED);
+        batch.accept(RuleDraftDeduplicator.Status.UPDATED);
+
+        assertEquals(2, batch.accepted());
+        assertEquals(1, batch.added());
+        assertEquals(1, batch.duplicated());
+    }
+
+    @Test
     public void mapsCurrentCandidateToCaptureRange() {
         AutomaticCaptureBatch batch = new AutomaticCaptureBatch(scanResult());
 

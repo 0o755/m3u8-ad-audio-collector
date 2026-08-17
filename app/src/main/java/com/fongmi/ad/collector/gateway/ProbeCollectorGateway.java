@@ -66,6 +66,8 @@ public final class ProbeCollectorGateway implements CollectorGateway {
     private final ProbePlayerHost player;
     private final ProbeToolHost tools;
     private final AdAudioProbe probe;
+    private final AutomaticPlaybackFollower automaticPlaybackFollower =
+            new AutomaticPlaybackFollower();
 
     private volatile Listener listener = NO_OP;
     private volatile Operation mediaOperation = new Operation(0L, 0L);
@@ -388,6 +390,8 @@ public final class ProbeCollectorGateway implements CollectorGateway {
         if (!isCurrent(operation) || automaticBatch == null) return;
         if (automaticBatch.isComplete()) {
             int accepted = automaticBatch.accepted();
+            int added = automaticBatch.added();
+            int duplicated = automaticBatch.duplicated();
             int total = automaticBatch.size();
             Failure firstFailure = automaticBatch.firstFailure();
             automaticBatch = null;
@@ -408,14 +412,15 @@ public final class ProbeCollectorGateway implements CollectorGateway {
             } else {
                 automaticWorkflowDone = true;
                 emitSnapshot(operation, Snapshot.State.READY,
-                        "自动采集完成，已生成 " + accepted + "/" + total + " 条待保存规则");
+                        automaticCompletionMessage(accepted, total, added, duplicated));
             }
             return;
         }
         HlsAdCandidate candidate = automaticBatch.current();
         CaptureRange range = automaticBatch.currentRange();
         automaticCapture = true;
-        // 可见播放器同步到当前候选，让用户直接核对正在采集的画面和声音。
+        // 宿主从候选起点开始，并随后按指纹进度分段快进到候选结束位置。
+        automaticPlaybackFollower.begin(range);
         player.seekTo(range.getAdStartMs());
         player.play();
         emitAutomaticCapture(operation, AutomaticCaptureProgress.capturing(range,
@@ -587,6 +592,7 @@ public final class ProbeCollectorGateway implements CollectorGateway {
     private void handleCaptureFailure(Operation operation, Failure failure) {
         captureSessionId = 0L;
         if (automaticCapture && automaticBatch != null) {
+            finishAutomaticPlayback();
             automaticBatch.reject(failure);
             executeControl(() -> startNextAutomaticCapture(operation));
         } else {
@@ -600,6 +606,30 @@ public final class ProbeCollectorGateway implements CollectorGateway {
         captureSessionId = 0L;
         automaticCapture = false;
         automaticBatch = null;
+        automaticPlaybackFollower.clear();
+    }
+
+    private void followAutomaticPlayback(int percent) {
+        long targetMs = automaticPlaybackFollower.advance(percent);
+        if (targetMs >= 0L) player.seekTo(targetMs);
+    }
+
+    private void finishAutomaticPlayback() {
+        long targetMs = automaticPlaybackFollower.finish();
+        if (targetMs >= 0L) player.seekTo(targetMs);
+    }
+
+    private String automaticCompletionMessage(int accepted, int total, int added,
+                                              int duplicated) {
+        String prefix = "自动采集完成，已处理 " + accepted + "/" + total + " 个候选，";
+        if (added == 0 && duplicated > 0) {
+            return prefix + "重复规则已合并，规则草稿 " + drafts.size() + " 条";
+        }
+        if (duplicated > 0) {
+            return prefix + "新增 " + added + " 条、合并重复 " + duplicated
+                    + " 条，规则草稿 " + drafts.size() + " 条";
+        }
+        return prefix + "规则草稿 " + drafts.size() + " 条";
     }
 
     private void cancelToolSessions() {
@@ -786,15 +816,15 @@ public final class ProbeCollectorGateway implements CollectorGateway {
                 emitPlaybackProgress();
                 return;
             }
+            if (automaticWorkflowDone) {
+                emitPlaybackProgress();
+                return;
+            }
             if (state == ProbePlayerState.PREPARING) {
                 emitSnapshot(operation, Snapshot.State.OPENING, "正在加载视频...");
             } else if (state == ProbePlayerState.BUFFERING) {
                 emitSnapshot(operation, Snapshot.State.BUFFERING, "正在缓冲...");
             } else if (state == ProbePlayerState.READY) {
-                if (automaticWorkflowDone) {
-                    emitPlaybackProgress();
-                    return;
-                }
                 emitSnapshot(operation, Snapshot.State.READY, "视频已就绪");
             } else if (state == ProbePlayerState.ENDED) {
                 emitSnapshot(operation, Snapshot.State.ENDED, "播放结束");
@@ -811,6 +841,8 @@ public final class ProbeCollectorGateway implements CollectorGateway {
             probe.notifyHostDiscontinuity(positionMs);
             if (snapshotState == Snapshot.State.SCANNING
                     || snapshotState == Snapshot.State.CAPTURING) {
+                emitPlaybackProgress();
+            } else if (automaticWorkflowDone) {
                 emitPlaybackProgress();
             } else {
                 emitSnapshot(operation, Snapshot.State.READY, "");
@@ -848,6 +880,7 @@ public final class ProbeCollectorGateway implements CollectorGateway {
         @Override public void onProgress(FingerprintCaptureProgress progress) {
             if (progress.getSessionId() != captureSessionId) return;
             if (automaticCapture && automaticBatch != null) {
+                followAutomaticPlayback(progress.getPercent());
                 emitAutomaticCapture(mediaOperation, AutomaticCaptureProgress.capturing(
                         automaticBatch.currentRange(), automaticBatch.currentNumber(),
                         automaticBatch.size(), progress.getPercent()));
@@ -866,14 +899,19 @@ public final class ProbeCollectorGateway implements CollectorGateway {
             captureSessionId = 0L;
             try {
                 ProbeRule rule = ProbeDraftMapper.toRule(draft);
-                drafts.put(rule.getId(), rule);
-                emitDraft(operation, rule);
+                RuleDraftDeduplicator.Result result =
+                        RuleDraftDeduplicator.collect(drafts, rules, rule);
+                if (result.isPending()) emitDraft(operation, result.rule());
                 if (automaticCapture && automaticBatch != null) {
-                    automaticBatch.accept();
+                    finishAutomaticPlayback();
+                    automaticBatch.accept(result.status());
                     startNextAutomaticCapture(operation);
+                } else if (!result.isPending()) {
+                    emitSnapshot(operation, Snapshot.State.READY,
+                            "已存在相同规则，无需重复保存");
                 } else {
                     emitSnapshot(operation, Snapshot.State.READY,
-                            "广告指纹提取完成，保存后参与自动跳过");
+                            "广告指纹提取完成，可先测试，确认后保存");
                 }
             } catch (IllegalArgumentException error) {
                 handleCaptureFailure(operation, new Failure(Failure.Code.RULES_INVALID, false,

@@ -200,7 +200,8 @@ public final class MainActivity extends AppCompatActivity implements CollectorVi
         rulePathText.setText(getString(R.string.rule_file_path, state.getRulePath()));
         ProbeRule draft = state.getDraft();
         int draftCount = state.getDraftDocument().getRules().size();
-        ruleText.setText(draft == null ? "" : "待保存规则 " + draftCount + " 条\n"
+        ruleText.setText(draft == null ? "" : "规则草稿 " + draftCount
+                + " 条（未保存，可直接测试）\n"
                 + draft.getId() + " · "
                 + String.format(Locale.US, "%.2f 秒", draft.getDurationMs() / 1000.0));
         CollectorGateway.AutomaticCaptureProgress progress =
