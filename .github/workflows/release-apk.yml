@@ -33,7 +33,7 @@ jobs:
           path: m3u8-ad-audio-probe
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
