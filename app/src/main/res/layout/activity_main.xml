@@ -14,14 +14,14 @@
 
         <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="190dp">
+            android:layout_height="190dp"
+            android:background="#FF000000">
 
             <!-- TextureView 的 Surface 只通过 ProbePlayer 公共门面附加。 -->
             <TextureView
                 android:id="@+id/playerView"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:background="#FF000000"
                 android:keepScreenOn="true" />
 
             <!-- 播放器时间标识保持透明，拖动进度时持续显示当前位置和总时长。 -->
