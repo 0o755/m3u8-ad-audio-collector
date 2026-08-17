@@ -60,8 +60,8 @@ interface CollectorGateway extends AutoCloseable {
 ## 线性化规则
 
 1. `open`、`stopCapture`、切源和 `close` 在网关的单线程控制执行器中排队。
-2. 新 `open` 先废弃旧 session，再停止旧探测/播放，最后创建新 session。
-3. 手动 seek、播放器时间轴 discontinuity 会递增 generation，并通知 Probe 清除旧候选；
+2. 新 `open` 先废弃前一 session，再停止前一探测/播放，最后创建新 session。
+3. 手动 seek、播放器时间轴 discontinuity 会递增 generation，并通知 Probe 清除过期候选；
    Collector session 仅在 open/切源时更新。
 4. 普通 buffering 不改变 session/generation，也不清除匹配候选。
 5. PCM 必须携带解码器真实 PTS；禁止用累计样本数伪造媒体时间轴。
@@ -69,7 +69,7 @@ interface CollectorGateway extends AutoCloseable {
 7. `close` 幂等，释放播放器、Probe、执行器和挂起回调。
 8. `Surface` 由 UI 持有，必须等待公开播放器的清除完成回调后才能释放。
 9. `testRule` 快照点击测试时的自动跳过模式；测试定位引发的新 Probe session 由当前
-   generation 接管，旧 session 的命中仍必须丢弃。
+   generation 接管，过期 session 的命中仍必须丢弃。
 10. 规则测试命中后，自动模式立即控制可见宿主播放器跳到广告结束位置；手动模式保留
     当前画面并发布“跳过广告”操作，用户确认后再控制同一播放器跳转。
 
@@ -99,7 +99,7 @@ interface CollectorGateway extends AutoCloseable {
   `max(local.revision, incoming.revision) + 1`，规则顺序稳定。
 - 自动或手动采集草稿按锚点配置和四相位完整指纹去重；重复扫描更新稳定 ID 的草稿，
   与已保存检测内容完全相同时不新增待保存项。
-- 导入包含任何旧 schema 或未知字段时整份拒绝，绝不静默迁移。
+- 导入不是 Probe Rules v1 或包含未知字段时整份拒绝，不做隐式格式转换。
 
 ## Probe 公开 API 接线
 
