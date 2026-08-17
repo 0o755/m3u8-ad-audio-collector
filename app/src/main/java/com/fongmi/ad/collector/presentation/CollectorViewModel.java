@@ -141,7 +141,13 @@ public final class CollectorViewModel implements CollectorGateway.Listener, Auto
 
     @Override
     public void onDraftReady(CollectorGateway.Operation operation, ProbeRule rule) {
-        update(state.withDraft(rule, "指纹提取完成，请测试规则"));
+        update(state.withDraft(rule, "指纹提取完成，保存后参与自动跳过"));
+    }
+
+    @Override
+    public void onAutomaticCapture(CollectorGateway.Operation operation,
+                                   CollectorGateway.AutomaticCaptureProgress progress) {
+        update(state.withAutomaticCapture(progress));
     }
 
     @Override

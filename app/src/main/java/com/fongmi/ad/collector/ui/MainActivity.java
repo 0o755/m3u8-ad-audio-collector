@@ -82,12 +82,15 @@ public final class MainActivity extends AppCompatActivity implements CollectorVi
                 (TextureView) findViewById(R.id.playerView),
                 new VideoSurfaceController.Listener() {
                     @Override public void onAttach(android.view.Surface surface) {
-                        viewModel.attachVideoSurface(surface);
+                        CollectorViewModel active = viewModel;
+                        if (active != null) active.attachVideoSurface(surface);
                     }
 
                     @Override public void onClear(android.view.Surface surface,
                                                   Runnable onCleared) {
-                        viewModel.clearVideoSurface(surface, onCleared);
+                        CollectorViewModel active = viewModel;
+                        if (active != null) active.clearVideoSurface(surface, onCleared);
+                        else onCleared.run();
                     }
                 });
         requestLegacyStoragePermission();
@@ -197,13 +200,30 @@ public final class MainActivity extends AppCompatActivity implements CollectorVi
         rulePathText.setText(getString(R.string.rule_file_path, state.getRulePath()));
         ProbeRule draft = state.getDraft();
         int draftCount = state.getDraftDocument().getRules().size();
-        ruleText.setText(draft == null ? "" : (draftCount > 1 ? "已生成 " + draftCount
-                + " 条规则\n" : "") + draft.getId() + " · "
+        ruleText.setText(draft == null ? "" : "待保存规则 " + draftCount + " 条\n"
+                + draft.getId() + " · "
                 + String.format(Locale.US, "%.2f 秒", draft.getDurationMs() / 1000.0));
-        boolean automaticScanning = state.getPlaybackState()
+        CollectorGateway.AutomaticCaptureProgress progress =
+                state.getAutomaticCaptureProgress();
+        if (progress != null && progress.getRange() != null) {
+            startMs = progress.getRange().getAdStartMs();
+            durationMs = progress.getRange().getDurationMs();
+            savedTemplateApplied = false;
+            refreshBoundary();
+        }
+        boolean automaticScanning = progress != null || state.getPlaybackState()
                 == CollectorGateway.Snapshot.State.SCANNING;
         autoScanButton.setEnabled(!automaticScanning);
-        autoScanButton.setText(automaticScanning ? R.string.auto_scanning : R.string.auto_scan);
+        if (progress == null) {
+            autoScanButton.setText(automaticScanning
+                    ? R.string.auto_scan_scanning : R.string.auto_scan);
+        } else if (progress.getStage()
+                == CollectorGateway.AutomaticCaptureProgress.Stage.SCANNING) {
+            autoScanButton.setText(R.string.auto_scan_scanning);
+        } else {
+            autoScanButton.setText(getString(R.string.auto_scan_capturing,
+                    progress.getCurrent(), progress.getTotal(), progress.getPercent()));
+        }
         playButton.setEnabled(!automaticScanning);
         boolean selectionEnabled = state.isMediaReady() || savedTemplateApplied;
         boundaryEditor.setEnabled(selectionEnabled);
@@ -215,6 +235,8 @@ public final class MainActivity extends AppCompatActivity implements CollectorVi
         extractButton.setEnabled(state.isMediaReady());
         testButton.setEnabled(draft != null);
         confirmButton.setEnabled(draft != null);
+        confirmButton.setText(draft == null ? getString(R.string.confirm_rule)
+                : getString(R.string.confirm_rule_count, draftCount));
     }
 
     @Override

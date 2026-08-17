@@ -61,6 +61,8 @@ public interface CollectorGateway extends AutoCloseable {
 
         void onDraftReady(Operation operation, ProbeRule rule);
 
+        void onAutomaticCapture(Operation operation, AutomaticCaptureProgress progress);
+
         void onMatch(Operation operation, Match match);
 
         void onFailure(Operation operation, Failure failure);
@@ -172,6 +174,43 @@ public interface CollectorGateway extends AutoCloseable {
         public long getDurationMs() { return durationMs; }
         public int getRuleCount() { return ruleCount; }
         public String getMessage() { return message; }
+    }
+
+    final class AutomaticCaptureProgress {
+        public enum Stage { SCANNING, CAPTURING }
+
+        private final Stage stage;
+        private final CaptureRange range;
+        private final int current;
+        private final int total;
+        private final int percent;
+
+        private AutomaticCaptureProgress(Stage stage, CaptureRange range, int current,
+                                         int total, int percent) {
+            this.stage = stage;
+            this.range = range;
+            this.current = Math.max(0, current);
+            this.total = Math.max(0, total);
+            this.percent = Math.max(0, Math.min(100, percent));
+        }
+
+        public static AutomaticCaptureProgress scanning() {
+            return new AutomaticCaptureProgress(Stage.SCANNING, null, 0, 0, 0);
+        }
+
+        public static AutomaticCaptureProgress capturing(CaptureRange range, int current,
+                                                          int total, int percent) {
+            if (range == null || current < 1 || total < current) {
+                throw new IllegalArgumentException("自动采集进度无效");
+            }
+            return new AutomaticCaptureProgress(Stage.CAPTURING, range, current, total, percent);
+        }
+
+        public Stage getStage() { return stage; }
+        public CaptureRange getRange() { return range; }
+        public int getCurrent() { return current; }
+        public int getTotal() { return total; }
+        public int getPercent() { return percent; }
     }
 
     final class Match {

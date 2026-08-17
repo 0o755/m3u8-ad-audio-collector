@@ -18,10 +18,12 @@ public final class CollectorUiState {
     private final RuleDocument draftDocument;
     private final boolean mediaReady;
     private final CollectorGateway.Snapshot.State playbackState;
+    private final CollectorGateway.AutomaticCaptureProgress automaticCaptureProgress;
 
     CollectorUiState(long positionMs, long mediaDurationMs, String status, String rulePath,
                      RuleDocument document, RuleDocument draftDocument, boolean mediaReady,
-                     CollectorGateway.Snapshot.State playbackState) {
+                     CollectorGateway.Snapshot.State playbackState,
+                     CollectorGateway.AutomaticCaptureProgress automaticCaptureProgress) {
         this.positionMs = positionMs;
         this.mediaDurationMs = mediaDurationMs;
         this.status = status;
@@ -30,19 +32,23 @@ public final class CollectorUiState {
         this.draftDocument = draftDocument;
         this.mediaReady = mediaReady;
         this.playbackState = playbackState;
+        this.automaticCaptureProgress = automaticCaptureProgress;
     }
 
     static CollectorUiState initial() {
         return new CollectorUiState(0L, 0L,
                 "粘贴链接并播放，设置广告开始位置和时长后提取指纹。",
                 "", RuleDocument.empty(), RuleDocument.empty(), false,
-                CollectorGateway.Snapshot.State.IDLE);
+                CollectorGateway.Snapshot.State.IDLE, null);
     }
 
     CollectorUiState withPlayback(long positionMs, long durationMs, String status,
                                   boolean ready, CollectorGateway.Snapshot.State playbackState) {
+        CollectorGateway.AutomaticCaptureProgress progress =
+                playbackState == CollectorGateway.Snapshot.State.SCANNING
+                        ? automaticCaptureProgress : null;
         return new CollectorUiState(positionMs, durationMs, status, rulePath,
-                document, draftDocument, ready, playbackState);
+                document, draftDocument, ready, playbackState, progress);
     }
 
     CollectorUiState withRules(RuleDocument document, String path, String status) {
@@ -52,7 +58,8 @@ public final class CollectorUiState {
         }
         return new CollectorUiState(positionMs, mediaDurationMs, status, path,
                 document, new RuleDocument(draftDocument.getRevision(),
-                new ArrayList<>(remaining.values())), mediaReady, playbackState);
+                new ArrayList<>(remaining.values())), mediaReady, playbackState,
+                automaticCaptureProgress);
     }
 
     CollectorUiState withDraft(ProbeRule draft, String status) {
@@ -61,12 +68,19 @@ public final class CollectorUiState {
         combined.put(draft.getId(), draft);
         return new CollectorUiState(positionMs, mediaDurationMs, status, rulePath,
                 document, new RuleDocument(draftDocument.getRevision(),
-                new ArrayList<>(combined.values())), mediaReady, playbackState);
+                new ArrayList<>(combined.values())), mediaReady, playbackState,
+                automaticCaptureProgress);
     }
 
     CollectorUiState withStatus(String status) {
         return new CollectorUiState(positionMs, mediaDurationMs, status, rulePath,
-                document, draftDocument, mediaReady, playbackState);
+                document, draftDocument, mediaReady, playbackState, automaticCaptureProgress);
+    }
+
+    CollectorUiState withAutomaticCapture(
+            CollectorGateway.AutomaticCaptureProgress progress) {
+        return new CollectorUiState(positionMs, mediaDurationMs, status, rulePath,
+                document, draftDocument, mediaReady, playbackState, progress);
     }
 
     public long getPositionMs() { return positionMs; }
@@ -81,4 +95,7 @@ public final class CollectorUiState {
     public RuleDocument getDraftDocument() { return draftDocument; }
     public boolean isMediaReady() { return mediaReady; }
     public CollectorGateway.Snapshot.State getPlaybackState() { return playbackState; }
+    public CollectorGateway.AutomaticCaptureProgress getAutomaticCaptureProgress() {
+        return automaticCaptureProgress;
+    }
 }

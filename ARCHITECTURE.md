@@ -44,6 +44,10 @@ IDLE -> OPENING -> READY <-> BUFFERING -> ENDED
 dispatcher 发布不可变快照。短暂 buffering 保持候选；显式 seek、切源或时间轴
 discontinuity 创建新 generation 并清空候选。
 
+自动扫描确定候选后，Gateway 同时发布结构化采集进度、将宿主播放器定位到候选起点并
+继续播放。ViewModel 只把候选范围映射为开始/结束输入和按钮进度，不接触播放器对象；
+自动采集期间禁止用户拖动进度，避免手动 seek 使当前扫描代际失效。
+
 ## 打开与跳转时序
 
 1. ViewModel 在点击“播放”时快照 URL、开始位置和自动跳过开关。
@@ -77,6 +81,6 @@ discontinuity 创建新 generation 并清空候选。
 
 ## Probe 公共边界
 
-Probe `0a0485d5` 的默认聚合模块提供 runtime、player、collector-tools，并通过
+Probe `4179e5e` 的默认聚合模块提供 runtime、player、collector-tools，并通过
 ServiceLoader 使用官方 Media3 1.9.2 adapter。采集器只调用公开门面，不接触 adapter PCM、
 matcher、Claim 或任何 `internal` 类型。第三方实现只能通过公开音频/播放 SPI Builder 注入。

@@ -4,6 +4,7 @@ package com.fongmi.ad.collector.gateway;
 import java.util.List;
 
 import io.github.fongmi.adaudio.probe.tools.HlsAdCandidate;
+import io.github.fongmi.adaudio.probe.tools.HlsCandidateOccurrence;
 import io.github.fongmi.adaudio.probe.tools.HlsScanResult;
 
 final class AutomaticCaptureBatch {
@@ -18,6 +19,14 @@ final class AutomaticCaptureBatch {
 
     HlsAdCandidate current() {
         return isComplete() ? null : candidates.get(index);
+    }
+
+    CollectorGateway.CaptureRange currentRange() {
+        HlsAdCandidate candidate = current();
+        if (candidate == null) return null;
+        HlsCandidateOccurrence occurrence = candidate.getOccurrences().get(0);
+        return new CollectorGateway.CaptureRange(occurrence.getStartMs(),
+                candidate.getDurationMs(), 0L, Math.min(5_000L, candidate.getDurationMs()));
     }
 
     int currentNumber() {

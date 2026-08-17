@@ -31,6 +31,18 @@ public final class AutomaticCaptureBatchTest {
         assertSame(first, batch.firstFailure());
     }
 
+    @Test
+    public void mapsCurrentCandidateToCaptureRange() {
+        AutomaticCaptureBatch batch = new AutomaticCaptureBatch(scanResult());
+
+        CollectorGateway.CaptureRange range = batch.currentRange();
+
+        assertEquals(1_000L, range.getAdStartMs());
+        assertEquals(2_000L, range.getDurationMs());
+        assertEquals(0L, range.getAnchorOffsetMs());
+        assertEquals(2_000L, range.getAnchorDurationMs());
+    }
+
     private static HlsScanResult scanResult() {
         HlsCandidateOccurrence first = new HlsCandidateOccurrence(1_000L, 3_000L, 1);
         HlsCandidateOccurrence second = new HlsCandidateOccurrence(5_000L, 7_000L, 1);

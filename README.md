@@ -8,10 +8,11 @@
 
 - 已完成独立 Android 工程、参考 UI、`CollectorGateway`、ViewModel 和回调代际隔离。
 - 已完成 Probe rules-v1 严格编解码、语义校验、稳定合并与 `RULES.JSON` 原子文件层。
-- 已基于 Probe `0a0485d5` 接入 `ProbePlayer`、远端/本地规则检测、结构化错误和
+- 已基于 Probe `4179e5e` 接入 `ProbePlayer`、远端/本地规则检测、结构化错误和
   `SkipRequest`，并对 Probe session 与采集器 generation 做二次校验。
 - 已接入 `AudioFingerprintCollector`、`HlsCandidateScanner`、本地规则替换终态和指定
-  单规则测试。自动扫描会逐个采集公开候选，候选本身不视为已确认广告。
+  单规则测试。自动扫描会逐个采集公开候选、回填起止位置并同步可见播放器，候选本身
+  不视为已确认广告。
 - 线上规则使用 `https://raw.githubusercontent.com/0o755/m3u8-ad-audio-probe/rules/rules.json`。
   当前文档合同合法但规则数为 0，必须由采集器生成并合并真实规则后才可能命中。
 

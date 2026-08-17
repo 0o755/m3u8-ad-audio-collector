@@ -39,7 +39,6 @@ import io.github.fongmi.adaudio.probe.player.ProbePlayerState;
 import io.github.fongmi.adaudio.probe.tools.FingerprintCaptureProgress;
 import io.github.fongmi.adaudio.probe.tools.FingerprintRuleDraft;
 import io.github.fongmi.adaudio.probe.tools.HlsAdCandidate;
-import io.github.fongmi.adaudio.probe.tools.HlsCandidateOccurrence;
 import io.github.fongmi.adaudio.probe.tools.HlsScanResult;
 import io.github.fongmi.adaudio.probe.tools.ProbeToolError;
 import io.github.fongmi.adaudio.probe.tools.ProbeToolErrorCode;
@@ -51,6 +50,8 @@ public final class ProbeCollectorGateway implements CollectorGateway {
         @Override public void onSnapshot(Operation operation, Snapshot snapshot) { }
         @Override public void onRulesLoaded(Operation operation, RuleDocument document, String path) { }
         @Override public void onDraftReady(Operation operation, ProbeRule rule) { }
+        @Override public void onAutomaticCapture(Operation operation,
+                                                  AutomaticCaptureProgress progress) { }
         @Override public void onMatch(Operation operation, Match match) { }
         @Override public void onFailure(Operation operation, Failure failure) { }
     };
@@ -85,6 +86,7 @@ public final class ProbeCollectorGateway implements CollectorGateway {
     private RuleReplacementAction replacementAction;
     private Snapshot.State snapshotState = Snapshot.State.READY;
     private String snapshotMessage = "";
+    private boolean automaticWorkflowDone;
 
     public static ProbeCollectorGateway create(Context context) {
         return new ProbeCollectorGateway(context);
@@ -119,6 +121,7 @@ public final class ProbeCollectorGateway implements CollectorGateway {
         Operation operation = newMediaOperation(false);
         executeControl(() -> {
             if (!isCurrent(operation) || playerSessionId <= 0L) return;
+            automaticWorkflowDone = false;
             pendingMatch = null;
             player.seekTo(positionMs);
         });
@@ -308,6 +311,7 @@ public final class ProbeCollectorGateway implements CollectorGateway {
 
     private ProbeMedia openLinearized(Operation operation, OpenRequest request) {
         if (!isCurrent(operation)) return null;
+        automaticWorkflowDone = false;
         cancelToolSessions();
         pendingMatch = null;
         testingRuleId = null;
@@ -342,6 +346,7 @@ public final class ProbeCollectorGateway implements CollectorGateway {
             return;
         }
         cancelCaptureFlow();
+        automaticWorkflowDone = false;
         automaticCapture = false;
         String ruleId = "ad-" + System.currentTimeMillis() + "-" + draftSequence.incrementAndGet();
         startCapture(operation, ruleId, range);
@@ -366,8 +371,10 @@ public final class ProbeCollectorGateway implements CollectorGateway {
         cancelCaptureFlow();
         tools.cancelScan();
         automaticBatch = null;
+        automaticWorkflowDone = false;
         try {
             scanSessionId = tools.scan(scanMedia, new ScanCallbacks(operation));
+            emitAutomaticCapture(operation, AutomaticCaptureProgress.scanning());
             emitSnapshot(operation, Snapshot.State.SCANNING, "正在分析 M3U8 时间线和分片边界...");
         } catch (IllegalArgumentException error) {
             emitMediaFailure(operation, Failure.Code.INVALID_REQUEST, false, safeMessage(error));
@@ -399,16 +406,20 @@ public final class ProbeCollectorGateway implements CollectorGateway {
                             firstFailure.isRetryable(), message);
                 }
             } else {
+                automaticWorkflowDone = true;
                 emitSnapshot(operation, Snapshot.State.READY,
-                        "自动采集完成，已生成 " + accepted + "/" + total + " 条规则");
+                        "自动采集完成，已生成 " + accepted + "/" + total + " 条待保存规则");
             }
             return;
         }
         HlsAdCandidate candidate = automaticBatch.current();
-        HlsCandidateOccurrence occurrence = candidate.getOccurrences().get(0);
+        CaptureRange range = automaticBatch.currentRange();
         automaticCapture = true;
-        CaptureRange range = new CaptureRange(occurrence.getStartMs(), candidate.getDurationMs(),
-                0L, Math.min(5_000L, candidate.getDurationMs()));
+        // 可见播放器同步到当前候选，让用户直接核对正在采集的画面和声音。
+        player.seekTo(range.getAdStartMs());
+        player.play();
+        emitAutomaticCapture(operation, AutomaticCaptureProgress.capturing(range,
+                automaticBatch.currentNumber(), automaticBatch.size(), 0));
         emitSnapshot(operation, Snapshot.State.SCANNING,
                 "自动采集 " + automaticBatch.currentNumber() + "/" + automaticBatch.size());
         startCapture(operation, candidate.getId(), range);
@@ -549,6 +560,7 @@ public final class ProbeCollectorGateway implements CollectorGateway {
         Operation operation = mediaOperation;
         if (!isCurrent(operation) || openRequest == null || status.getSessionId() <= 0L) return;
         if (probeSessionId != 0L && status.getSessionId() != probeSessionId) return;
+        if (automaticWorkflowDone) return;
         probeSessionId = status.getSessionId();
         if (snapshotState == Snapshot.State.SCANNING
                 || snapshotState == Snapshot.State.CAPTURING
@@ -649,6 +661,10 @@ public final class ProbeCollectorGateway implements CollectorGateway {
 
     private void emitDraft(Operation operation, ProbeRule rule) {
         emitCurrent(operation, () -> listener.onDraftReady(operation, rule));
+    }
+
+    private void emitAutomaticCapture(Operation operation, AutomaticCaptureProgress progress) {
+        emitCurrent(operation, () -> listener.onAutomaticCapture(operation, progress));
     }
 
     private void emitMatch(Operation operation, Match match) {
@@ -775,6 +791,10 @@ public final class ProbeCollectorGateway implements CollectorGateway {
             } else if (state == ProbePlayerState.BUFFERING) {
                 emitSnapshot(operation, Snapshot.State.BUFFERING, "正在缓冲...");
             } else if (state == ProbePlayerState.READY) {
+                if (automaticWorkflowDone) {
+                    emitPlaybackProgress();
+                    return;
+                }
                 emitSnapshot(operation, Snapshot.State.READY, "视频已就绪");
             } else if (state == ProbePlayerState.ENDED) {
                 emitSnapshot(operation, Snapshot.State.ENDED, "播放结束");
@@ -827,9 +847,17 @@ public final class ProbeCollectorGateway implements CollectorGateway {
     private final class CaptureCallbacks implements ProbeToolHost.CaptureListener {
         @Override public void onProgress(FingerprintCaptureProgress progress) {
             if (progress.getSessionId() != captureSessionId) return;
+            if (automaticCapture && automaticBatch != null) {
+                emitAutomaticCapture(mediaOperation, AutomaticCaptureProgress.capturing(
+                        automaticBatch.currentRange(), automaticBatch.currentNumber(),
+                        automaticBatch.size(), progress.getPercent()));
+            }
             emitSnapshot(mediaOperation, automaticCapture
                             ? Snapshot.State.SCANNING : Snapshot.State.CAPTURING,
-                    "正在提取广告指纹... " + progress.getPercent() + "%");
+                    automaticCapture && automaticBatch != null
+                            ? "自动采集 " + automaticBatch.currentNumber() + "/"
+                            + automaticBatch.size() + "，指纹 " + progress.getPercent() + "%"
+                            : "正在提取广告指纹... " + progress.getPercent() + "%");
         }
 
         @Override public void onCompleted(long sessionId, FingerprintRuleDraft draft) {
@@ -844,7 +872,8 @@ public final class ProbeCollectorGateway implements CollectorGateway {
                     automaticBatch.accept();
                     startNextAutomaticCapture(operation);
                 } else {
-                    emitSnapshot(operation, Snapshot.State.READY, "广告指纹提取完成，请测试规则");
+                    emitSnapshot(operation, Snapshot.State.READY,
+                            "广告指纹提取完成，保存后参与自动跳过");
                 }
             } catch (IllegalArgumentException error) {
                 handleCaptureFailure(operation, new Failure(Failure.Code.RULES_INVALID, false,

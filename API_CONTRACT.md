@@ -48,6 +48,8 @@ interface CollectorGateway extends AutoCloseable {
 - `OpenRequest`：`url`、只读 `headers`、`startPositionMs`、`automaticSkip`。
 - `CaptureRange`：广告起点、广告总时长、锚点偏移与锚点时长；锚点必须完整位于广告内。
 - `Snapshot`：播放器位置/总时长、加载或工作流状态、规则数量与状态文字。
+- `AutomaticCaptureProgress`：扫描/采集阶段、当前候选序号、指纹百分比和候选范围；
+  UI 用该范围回填开始/结束，Gateway 同步控制可见播放器播放候选画面。
 - `Match`：ruleId、广告起止位置、建议跳转位置、是否自动跳过。
 - `Failure`：稳定错误码、可重试标志和安全诊断文字。
 
