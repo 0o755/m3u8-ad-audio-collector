@@ -14,6 +14,7 @@ public final class CollectorViewModel implements CollectorGateway.Listener, Auto
     public interface Observer {
         void onState(CollectorUiState state);
         void onMatch(CollectorGateway.Match match);
+        void onMatchCleared();
         void onFailure(CollectorGateway.Failure failure);
     }
 
@@ -81,16 +82,17 @@ public final class CollectorViewModel implements CollectorGateway.Listener, Auto
 
     public void capture(long startMs, long durationMs) {
         try {
-            long anchorDuration = Math.min(5_000L, durationMs);
             gateway.startCapture(new CollectorGateway.CaptureRange(startMs, durationMs,
-                    0L, anchorDuration));
+                    0L, CollectorGateway.CaptureRange.REQUIRED_ANCHOR_DURATION_MS));
         } catch (IllegalArgumentException error) {
             update(state.withStatus(error.getMessage()));
         }
     }
 
-    public void testDraft() {
-        if (state.getDraft() != null) gateway.testRule(state.getDraft().getId());
+    public void testDraft(boolean automaticSkip) {
+        if (state.getDraft() != null) {
+            gateway.testRule(state.getDraft().getId(), automaticSkip);
+        }
     }
 
     public void saveDraft() {
@@ -155,6 +157,11 @@ public final class CollectorViewModel implements CollectorGateway.Listener, Auto
         if (observer != null) observer.onMatch(match);
         if (match.isAutomatic()) update(state.withStatus("已自动跳到广告结束位置"));
         else update(state.withStatus("发现广告，可手动跳过"));
+    }
+
+    @Override
+    public void onMatchCleared(CollectorGateway.Operation operation) {
+        if (observer != null) observer.onMatchCleared();
     }
 
     @Override

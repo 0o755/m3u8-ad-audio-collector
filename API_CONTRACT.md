@@ -29,7 +29,7 @@ interface CollectorGateway extends AutoCloseable {
     Operation clearSurface(Surface surface, Runnable onCleared);
     Operation startCapture(CaptureRange range);
     Operation stopCapture();
-    Operation testRule(String ruleId);
+    Operation testRule(String ruleId, boolean automaticSkip);
     Operation saveRule(RuleDocument document);
     Operation merge(RuleDocument document);
     Operation loadRules();
@@ -46,7 +46,8 @@ interface CollectorGateway extends AutoCloseable {
 ## 请求与回调
 
 - `OpenRequest`：`url`、只读 `headers`、`startPositionMs`、`automaticSkip`。
-- `CaptureRange`：广告起点、广告总时长、锚点偏移与锚点时长；锚点必须完整位于广告内。
+- `CaptureRange`：广告起点、广告总时长、锚点偏移与固定 5000ms 锚点；广告与锚点都必须
+  完整覆盖 5 秒，锚点必须完整位于广告内。
 - `Snapshot`：播放器位置/总时长、加载或工作流状态、规则数量与状态文字。
 - `AutomaticCaptureProgress`：扫描/采集阶段、当前候选序号、指纹百分比和候选范围；
   UI 用该范围回填开始/结束，Gateway 同步控制可见播放器分段快进候选画面。
@@ -67,6 +68,10 @@ interface CollectorGateway extends AutoCloseable {
 6. 跳转在排队前和真正调用适配器前各校验一次 session/generation；失效请求直接丢弃。
 7. `close` 幂等，释放播放器、Probe、执行器和挂起回调。
 8. `Surface` 由 UI 持有，必须等待公开播放器的清除完成回调后才能释放。
+9. `testRule` 快照点击测试时的自动跳过模式；测试定位引发的新 Probe session 由当前
+   generation 接管，旧 session 的命中仍必须丢弃。
+10. 规则测试命中后，自动模式立即控制可见宿主播放器跳到广告结束位置；手动模式保留
+    当前画面并发布“跳过广告”操作，用户确认后再控制同一播放器跳转。
 
 ## Probe Rules v1
 

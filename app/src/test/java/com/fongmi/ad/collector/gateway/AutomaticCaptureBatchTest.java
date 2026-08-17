@@ -2,6 +2,7 @@
 package com.fongmi.ad.collector.gateway;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 
 import org.junit.Test;
@@ -50,17 +51,25 @@ public final class AutomaticCaptureBatchTest {
         CollectorGateway.CaptureRange range = batch.currentRange();
 
         assertEquals(1_000L, range.getAdStartMs());
-        assertEquals(2_000L, range.getDurationMs());
+        assertEquals(6_000L, range.getDurationMs());
         assertEquals(0L, range.getAnchorOffsetMs());
-        assertEquals(2_000L, range.getAnchorDurationMs());
+        assertEquals(5_000L, range.getAnchorDurationMs());
+    }
+
+    @Test
+    public void rejectsCandidateShorterThanRequiredAnchor() {
+        AutomaticCaptureBatch batch = new AutomaticCaptureBatch(scanResult());
+        batch.accept(RuleDraftDeduplicator.Status.ADDED);
+
+        assertNull(batch.currentRange());
     }
 
     private static HlsScanResult scanResult() {
-        HlsCandidateOccurrence first = new HlsCandidateOccurrence(1_000L, 3_000L, 1);
-        HlsCandidateOccurrence second = new HlsCandidateOccurrence(5_000L, 7_000L, 1);
+        HlsCandidateOccurrence first = new HlsCandidateOccurrence(1_000L, 7_000L, 1);
+        HlsCandidateOccurrence second = new HlsCandidateOccurrence(8_000L, 10_000L, 1);
         HlsAdCandidate firstCandidate = candidate("auto-ad-0000000000000001", first);
         HlsAdCandidate secondCandidate = candidate("auto-ad-0000000000000002", second);
-        return new HlsScanResult(1L, "https://example.com/video.m3u8", 10_000L, 2,
+        return new HlsScanResult(1L, "https://example.com/video.m3u8", 12_000L, 2,
                 java.util.Arrays.asList(firstCandidate, secondCandidate));
     }
 

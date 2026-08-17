@@ -11,6 +11,7 @@ import java.util.Set;
 import java.util.regex.Pattern;
 
 public final class RuleDocumentValidator {
+    private static final long REQUIRED_ANCHOR_DURATION_MS = 5_000L;
     public static final long MAX_SAFE_INTEGER = 9_007_199_254_740_991L;
     private static final int[] PHASES = {0, 64, 128, 192};
     private static final Pattern ID = Pattern.compile("[a-z0-9][a-z0-9._-]{0,63}");
@@ -43,12 +44,12 @@ public final class RuleDocumentValidator {
         if (rule == null || rule.getId() == null || !ID.matcher(rule.getId()).matches()) {
             throw new IllegalArgumentException("规则 ID 不符合 Probe v1 约束");
         }
-        if (rule.getDurationMs() < 1_000L || rule.getDurationMs() > 600_000L) {
+        if (rule.getDurationMs() < REQUIRED_ANCHOR_DURATION_MS
+                || rule.getDurationMs() > 600_000L) {
             throw new IllegalArgumentException("规则时长超出范围: " + rule.getId());
         }
         if (rule.getAnchorOffsetMs() < 0L
-                || rule.getAnchorDurationMs() < 2_000L
-                || rule.getAnchorDurationMs() > 5_000L
+                || rule.getAnchorDurationMs() != REQUIRED_ANCHOR_DURATION_MS
                 || rule.getAnchorOffsetMs() > rule.getDurationMs() - rule.getAnchorDurationMs()) {
             throw new IllegalArgumentException("锚点范围无效: " + rule.getId());
         }

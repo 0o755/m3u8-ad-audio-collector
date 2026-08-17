@@ -52,5 +52,7 @@ final class RuleTestOverlay {
         skipButton.setOnClickListener(null);
         skipButton.setVisibility(showSkip ? View.VISIBLE : View.GONE);
         container.setVisibility(View.VISIBLE);
+        // TextureView 画面更新时也要保证测试提示和跳过按钮处于最上层。
+        container.bringToFront();
     }
 }

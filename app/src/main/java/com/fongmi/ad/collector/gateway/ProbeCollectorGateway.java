@@ -53,6 +53,7 @@ public final class ProbeCollectorGateway implements CollectorGateway {
         @Override public void onAutomaticCapture(Operation operation,
                                                   AutomaticCaptureProgress progress) { }
         @Override public void onMatch(Operation operation, Match match) { }
+        @Override public void onMatchCleared(Operation operation) { }
         @Override public void onFailure(Operation operation, Failure failure) { }
     };
 
@@ -66,6 +67,7 @@ public final class ProbeCollectorGateway implements CollectorGateway {
     private final ProbePlayerHost player;
     private final ProbeToolHost tools;
     private final AdAudioProbe probe;
+    private final ProbeSessionGate probeSessions = new ProbeSessionGate();
     private final AutomaticPlaybackFollower automaticPlaybackFollower =
             new AutomaticPlaybackFollower();
 
@@ -78,13 +80,13 @@ public final class ProbeCollectorGateway implements CollectorGateway {
     private OpenRequest openRequest;
     private ProbeMedia media;
     private long playerSessionId;
-    private long probeSessionId;
     private long captureSessionId;
     private long scanSessionId;
     private boolean automaticCapture;
     private AutomaticCaptureBatch automaticBatch;
     private Match pendingMatch;
     private String testingRuleId;
+    private boolean testingAutomaticSkip;
     private RuleReplacementAction replacementAction;
     private Snapshot.State snapshotState = Snapshot.State.READY;
     private String snapshotMessage = "";
@@ -124,7 +126,7 @@ public final class ProbeCollectorGateway implements CollectorGateway {
         executeControl(() -> {
             if (!isCurrent(operation) || playerSessionId <= 0L) return;
             automaticWorkflowDone = false;
-            pendingMatch = null;
+            clearPendingMatch(operation);
             player.seekTo(positionMs);
         });
         return operation;
@@ -181,9 +183,9 @@ public final class ProbeCollectorGateway implements CollectorGateway {
         return operation;
     }
 
-    @Override public Operation testRule(String ruleId) {
+    @Override public Operation testRule(String ruleId, boolean automaticSkip) {
         Operation operation = mediaOperation;
-        executeControl(() -> beginRuleTest(operation, ruleId));
+        executeControl(() -> beginRuleTest(operation, ruleId, automaticSkip));
         return operation;
     }
 
@@ -287,6 +289,7 @@ public final class ProbeCollectorGateway implements CollectorGateway {
             long target = pendingMatch.getEndMs();
             pendingMatch = null;
             player.seekTo(target);
+            emitSnapshot(operation, Snapshot.State.READY, "已手动跳到广告结束位置");
         });
         return operation;
     }
@@ -315,12 +318,13 @@ public final class ProbeCollectorGateway implements CollectorGateway {
         if (!isCurrent(operation)) return null;
         automaticWorkflowDone = false;
         cancelToolSessions();
-        pendingMatch = null;
+        clearPendingMatch(operation);
         testingRuleId = null;
+        testingAutomaticSkip = false;
         player.stop();
         playerSessionId = 0L;
         probe.stop();
-        probeSessionId = -1L;
+        probeSessions.block();
         try {
             ProbeMedia opened = ProbeMedia.builder(request.getUrl())
                     .setHeaders(request.getHeaders())
@@ -388,6 +392,10 @@ public final class ProbeCollectorGateway implements CollectorGateway {
 
     private void startNextAutomaticCapture(Operation operation) {
         if (!isCurrent(operation) || automaticBatch == null) return;
+        while (!automaticBatch.isComplete() && automaticBatch.currentRange() == null) {
+            automaticBatch.reject(new Failure(Failure.Code.INVALID_REQUEST, false,
+                    "候选广告时长不足 5 秒，无法生成完整指纹"));
+        }
         if (automaticBatch.isComplete()) {
             int accepted = automaticBatch.accepted();
             int added = automaticBatch.added();
@@ -430,7 +438,7 @@ public final class ProbeCollectorGateway implements CollectorGateway {
         startCapture(operation, candidate.getId(), range);
     }
 
-    private void beginRuleTest(Operation operation, String ruleId) {
+    private void beginRuleTest(Operation operation, String ruleId, boolean automaticSkip) {
         if (!isCurrent(operation) || media == null || openRequest == null) {
             emitMediaFailure(operation, Failure.Code.INVALID_REQUEST, false,
                     "请先打开测试媒体");
@@ -443,18 +451,17 @@ public final class ProbeCollectorGateway implements CollectorGateway {
                     "找不到待测试规则: " + ruleId);
             return;
         }
+        // 每次测试都是独立演示，不能沿用上一次自动采集或手动命中的状态。
+        automaticWorkflowDone = false;
+        pendingMatch = null;
         try {
-            RuleDocument testDocument = rules;
-            if (drafts.containsKey(ruleId)) {
-                RuleDocument one = new RuleDocument(rules.getRevision(),
-                        Collections.singletonList(rule));
-                testDocument = RuleDocumentMerger.merge(rules, one);
-            }
-            replaceProbeRules(operation, testDocument, ReplacementKind.TEST_ONE, ruleId);
+            RuleDocument testDocument = selectRuleTestDocument(rules, drafts, ruleId, rule);
+            replaceProbeRules(operation, testDocument, ReplacementKind.TEST_ONE, ruleId,
+                    null, automaticSkip);
             emitSnapshot(operation, Snapshot.State.TESTING, "正在载入指定规则...");
         } catch (IllegalArgumentException error) {
             emitMediaFailure(operation, Failure.Code.RULES_INVALID, false,
-                    "待测试规则与当前规则冲突: " + safeMessage(error));
+                    "待测试规则无效: " + safeMessage(error));
         }
     }
 
@@ -474,10 +481,16 @@ public final class ProbeCollectorGateway implements CollectorGateway {
     private void replaceProbeRules(Operation operation, RuleDocument document,
                                    ReplacementKind kind, String ruleId,
                                    ProbeMedia mediaToOpen) {
+        replaceProbeRules(operation, document, kind, ruleId, mediaToOpen, false);
+    }
+
+    private void replaceProbeRules(Operation operation, RuleDocument document,
+                                   ReplacementKind kind, String ruleId,
+                                   ProbeMedia mediaToOpen, boolean automaticSkip) {
         try {
             long requestId = probe.replaceRulesJson(RuleDocumentCodec.toJson(document));
             replacementAction = new RuleReplacementAction(requestId, operation, kind, ruleId,
-                    mediaToOpen, operation == rulesOperation);
+                    mediaToOpen, operation == rulesOperation, automaticSkip);
         } catch (IllegalArgumentException error) {
             emitReplacementFailure(operation, kind, Failure.Code.RULES_INVALID, false,
                     "Probe 拒绝规则文档: " + safeMessage(error));
@@ -508,14 +521,16 @@ public final class ProbeCollectorGateway implements CollectorGateway {
             return;
         }
         try {
-            probeSessionId = result.getSessionId();
+            probeSessions.replace(result.getSessionId());
             if (action.kind == ReplacementKind.OPEN_MEDIA) {
                 testingRuleId = null;
+                testingAutomaticSkip = false;
                 probe.useAllRules();
-                probeSessionId = probe.open(action.mediaToOpen);
+                probeSessions.replace(probe.open(action.mediaToOpen));
             } else if (action.kind == ReplacementKind.TEST_ONE) {
                 testingRuleId = action.ruleId;
-                probeSessionId = probe.useRuleForTesting(action.ruleId);
+                testingAutomaticSkip = action.automaticSkip;
+                probeSessions.replace(probe.useRuleForTesting(action.ruleId));
                 ProbeRule rule = drafts.get(action.ruleId);
                 if (rule == null) rule = rules.find(action.ruleId);
                 long start = rule != null && rule.getTest() != null
@@ -525,10 +540,12 @@ public final class ProbeCollectorGateway implements CollectorGateway {
                 emitSnapshot(mediaOperation, Snapshot.State.TESTING, "正在测试规则 " + action.ruleId);
             } else {
                 testingRuleId = null;
-                probeSessionId = probe.useAllRules();
-                if (probeSessionId == 0L && media != null && playerSessionId > 0L) {
-                    probeSessionId = probe.open(media);
+                testingAutomaticSkip = false;
+                long sessionId = probe.useAllRules();
+                if (sessionId == 0L && media != null && playerSessionId > 0L) {
+                    sessionId = probe.open(media);
                 }
+                probeSessions.replace(sessionId);
             }
         } catch (IllegalArgumentException | IllegalStateException error) {
             emitRuleActionFailure(action, Failure.Code.RULES_INVALID, false,
@@ -538,18 +555,19 @@ public final class ProbeCollectorGateway implements CollectorGateway {
 
     private void handleSkip(SkipRequest request) {
         Operation operation = mediaOperation;
-        if (!isCurrent(operation) || request.getSessionId() != probeSessionId
-                || openRequest == null) return;
+        if (!isCurrent(operation) || openRequest == null) return;
+        if (!probeSessions.accept(request.getSessionId())) return;
+        boolean automatic = resolveAutomaticSkip(testingRuleId != null,
+                testingAutomaticSkip, openRequest.isAutomaticSkip());
         Match match = new Match(request.getRuleId(), request.getAdStartPositionMs(),
-                request.getAdEndPositionMs(), openRequest.isAutomaticSkip());
+                request.getAdEndPositionMs(), automatic);
         if (match.isAutomatic()) {
             if (!isCurrent(operation)) return;
             player.seekTo(request.getSeekTargetPositionMs());
+            emitSnapshot(operation, Snapshot.State.READY, "已自动跳到广告结束位置");
         } else {
             pendingMatch = match;
-        }
-        if (testingRuleId != null) {
-            emitSnapshot(operation, Snapshot.State.READY, "规则测试完成");
+            emitSnapshot(operation, Snapshot.State.READY, "检测到广告，等待手动跳过");
         }
         emitMatch(operation, match);
         restoreAllRulesAfterTest(operation);
@@ -558,15 +576,16 @@ public final class ProbeCollectorGateway implements CollectorGateway {
     private void restoreAllRulesAfterTest(Operation operation) {
         if (testingRuleId == null) return;
         testingRuleId = null;
+        testingAutomaticSkip = false;
         replaceProbeRules(operation, rules, ReplacementKind.APPLY_ALL, null);
     }
 
     private void handleProbeStatus(ProbeStatus status) {
         Operation operation = mediaOperation;
         if (!isCurrent(operation) || openRequest == null || status.getSessionId() <= 0L) return;
-        if (probeSessionId != 0L && status.getSessionId() != probeSessionId) return;
+        boolean accepted = probeSessions.accept(status.getSessionId());
+        if (!accepted) return;
         if (automaticWorkflowDone) return;
-        probeSessionId = status.getSessionId();
         if (snapshotState == Snapshot.State.SCANNING
                 || snapshotState == Snapshot.State.CAPTURING
                 || snapshotState == Snapshot.State.TESTING) return;
@@ -584,7 +603,7 @@ public final class ProbeCollectorGateway implements CollectorGateway {
     private void handleProbeError(ProbeError error) {
         Operation operation = mediaOperation;
         if (!isCurrent(operation)) return;
-        if (error.getSessionId() > 0L && error.getSessionId() != probeSessionId) return;
+        if (error.getSessionId() > 0L && !probeSessions.accept(error.getSessionId())) return;
         emitMediaFailure(operation, mapProbeError(error.getCode()), error.isRetryable(),
                 error.getMessage());
     }
@@ -701,6 +720,12 @@ public final class ProbeCollectorGateway implements CollectorGateway {
         emitCurrent(operation, () -> listener.onMatch(operation, match));
     }
 
+    private void clearPendingMatch(Operation operation) {
+        if (pendingMatch == null) return;
+        pendingMatch = null;
+        emitCurrent(operation, () -> listener.onMatchCleared(operation));
+    }
+
     private void emitMediaFailure(Operation operation, Failure.Code code,
                                   boolean retryable, String message) {
         emitSnapshot(operation, playerSessionId > 0L
@@ -728,7 +753,7 @@ public final class ProbeCollectorGateway implements CollectorGateway {
                                         Failure.Code code, boolean retryable, String message) {
         boolean rulesScoped = kind == ReplacementKind.APPLY_ALL && operation == rulesOperation;
         RuleReplacementAction action = new RuleReplacementAction(0L, operation, kind, null,
-                null, rulesScoped);
+                null, rulesScoped, false);
         emitRuleActionFailure(action, code, retryable, message);
     }
 
@@ -787,6 +812,23 @@ public final class ProbeCollectorGateway implements CollectorGateway {
         }
     }
 
+    static boolean resolveAutomaticSkip(boolean testing, boolean testingMode,
+                                        boolean playbackMode) {
+        return testing ? testingMode : playbackMode;
+    }
+
+    static RuleDocument selectRuleTestDocument(RuleDocument stored,
+                                                Map<String, ProbeRule> pendingDrafts,
+                                                String ruleId, ProbeRule selected) {
+        if (!pendingDrafts.containsKey(ruleId)) return stored;
+        // 草稿测试只注入当前规则，避免旧规则的相近指纹干扰测试结果。
+        return new RuleDocument(stored.getRevision(), Collections.singletonList(selected));
+    }
+
+    static boolean isPendingMatchExpired(Match match, long positionMs) {
+        return match != null && positionMs >= match.getEndMs();
+    }
+
     static Failure.Code mapToolError(ProbeToolErrorCode code) {
         switch (code) {
             case INVALID_REQUEST: return Failure.Code.INVALID_REQUEST;
@@ -811,6 +853,7 @@ public final class ProbeCollectorGateway implements CollectorGateway {
             if (sessionId != playerSessionId) return;
             Operation operation = mediaOperation;
             if (!isCurrent(operation)) return;
+            if (isPendingMatchExpired(pendingMatch, positionMs)) clearPendingMatch(operation);
             if (snapshotState == Snapshot.State.SCANNING
                     || snapshotState == Snapshot.State.CAPTURING) {
                 emitPlaybackProgress();
@@ -836,8 +879,9 @@ public final class ProbeCollectorGateway implements CollectorGateway {
             if (sessionId != playerSessionId || closed) return;
             Operation operation = mediaOperation;
             if (!isCurrent(operation)) return;
-            pendingMatch = null;
+            clearPendingMatch(operation);
             // 播放器回退和 HLS 断点仍属同一请求；用户 open/seek 已在入口更新 generation。
+            probeSessions.expectNext();
             probe.notifyHostDiscontinuity(positionMs);
             if (snapshotState == Snapshot.State.SCANNING
                     || snapshotState == Snapshot.State.CAPTURING) {
@@ -970,16 +1014,18 @@ public final class ProbeCollectorGateway implements CollectorGateway {
         final String ruleId;
         final ProbeMedia mediaToOpen;
         final boolean rulesScoped;
+        final boolean automaticSkip;
 
         RuleReplacementAction(long requestId, Operation operation,
                               ReplacementKind kind, String ruleId, ProbeMedia mediaToOpen,
-                              boolean rulesScoped) {
+                              boolean rulesScoped, boolean automaticSkip) {
             this.requestId = requestId;
             this.operation = operation;
             this.kind = kind;
             this.ruleId = ruleId;
             this.mediaToOpen = mediaToOpen;
             this.rulesScoped = rulesScoped;
+            this.automaticSkip = automaticSkip;
         }
     }
 }

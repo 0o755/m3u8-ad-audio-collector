@@ -55,11 +55,13 @@ discontinuity 创建新 generation 并清空候选。
 2. 网关生成新 session/generation，废弃旧回调。
 3. Probe 播放适配器异步打开同一媒体，并定位到 `start - 5s`。
 4. Probe detector 使用适配器时间轴和真实 PTS 独立分析。
-5. 命中时若快照为自动跳过，网关二次校验后静默 seek；否则发布手动提示。
-6. 用户点击提示按钮时再次校验 session/generation，再执行 seek。
+5. 命中时若快照为自动跳过，网关二次校验后控制可见宿主播放器跳到广告结束位置，
+   并发布明确完成状态；否则在视频最上层显示“广告中”和“跳过广告”按钮。
+6. 用户点击提示按钮时再次校验 session/generation，控制同一可见播放器跳转并关闭提示。
 
 自动跳过模式属于播放请求快照；播放途中勾选框变化只影响下一次播放请求，避免一个会话
-内策略漂移。
+内策略漂移。点击“测试规则”是独立请求，会重新快照当时的开关状态；测试定位产生的
+Probe 新 session 由会话门闩接管，防止命中被旧 sessionId 校验误丢弃。
 
 ## UI 兼容策略
 
@@ -82,6 +84,6 @@ discontinuity 创建新 generation 并清空候选。
 
 ## Probe 公共边界
 
-Probe `4179e5e` 的默认聚合模块提供 runtime、player、collector-tools，并通过
+Probe `d4109b5` 的默认聚合模块提供 runtime、player、collector-tools，并通过
 ServiceLoader 使用官方 Media3 1.9.2 adapter。采集器只调用公开门面，不接触 adapter PCM、
 matcher、Claim 或任何 `internal` 类型。第三方实现只能通过公开音频/播放 SPI Builder 注入。

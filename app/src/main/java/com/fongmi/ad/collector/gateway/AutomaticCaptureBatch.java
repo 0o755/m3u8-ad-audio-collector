@@ -25,10 +25,12 @@ final class AutomaticCaptureBatch {
 
     CollectorGateway.CaptureRange currentRange() {
         HlsAdCandidate candidate = current();
-        if (candidate == null) return null;
+        if (candidate == null || candidate.getDurationMs()
+                < CollectorGateway.CaptureRange.REQUIRED_ANCHOR_DURATION_MS) return null;
         HlsCandidateOccurrence occurrence = candidate.getOccurrences().get(0);
         return new CollectorGateway.CaptureRange(occurrence.getStartMs(),
-                candidate.getDurationMs(), 0L, Math.min(5_000L, candidate.getDurationMs()));
+                candidate.getDurationMs(), 0L,
+                CollectorGateway.CaptureRange.REQUIRED_ANCHOR_DURATION_MS);
     }
 
     int currentNumber() {

@@ -141,12 +141,12 @@ public final class MainActivity extends AppCompatActivity implements CollectorVi
                     }
 
                     @Override public void onSetEnd(long positionMs) {
-                        durationMs = Math.max(2_000L, positionMs - startMs);
+                        durationMs = Math.max(5_000L, positionMs - startMs);
                         refreshBoundary();
                     }
 
                     @Override public void onSetDuration(long value) {
-                        durationMs = Math.max(2_000L, value);
+                        durationMs = Math.max(5_000L, value);
                         refreshBoundary();
                     }
                 });
@@ -166,7 +166,7 @@ public final class MainActivity extends AppCompatActivity implements CollectorVi
             refreshBoundary();
         });
         useCurrentEndButton.setOnClickListener(view -> {
-            durationMs = Math.max(2_000L, viewModel.getState().getPositionMs() - startMs);
+            durationMs = Math.max(5_000L, viewModel.getState().getPositionMs() - startMs);
             refreshBoundary();
         });
         startPreviewButton.setOnClickListener(view -> viewModel.previewPosition(startMs));
@@ -177,7 +177,7 @@ public final class MainActivity extends AppCompatActivity implements CollectorVi
         extractButton.setOnClickListener(view -> viewModel.capture(startMs, durationMs));
         testButton.setOnClickListener(view -> {
             testOverlay.showWaiting();
-            viewModel.testDraft();
+            viewModel.testDraft(autoSkipCheckBox.isChecked());
         });
         confirmButton.setOnClickListener(view -> viewModel.saveDraft());
         savedRulesButton.setOnClickListener(view -> showRuleList());
@@ -234,7 +234,8 @@ public final class MainActivity extends AppCompatActivity implements CollectorVi
         endPreviewButton.setEnabled(state.isMediaReady());
         durationPreviewButton.setEnabled(state.isMediaReady());
         extractButton.setEnabled(state.isMediaReady());
-        testButton.setEnabled(draft != null);
+        testButton.setEnabled(draft != null && state.getPlaybackState()
+                != CollectorGateway.Snapshot.State.TESTING);
         confirmButton.setEnabled(draft != null);
         confirmButton.setText(draft == null ? getString(R.string.confirm_rule)
                 : getString(R.string.confirm_rule_count, draftCount));
@@ -246,8 +247,15 @@ public final class MainActivity extends AppCompatActivity implements CollectorVi
             testOverlay.hide();
             return;
         }
-        testOverlay.showAdDetected(formatPosition(match.getEndMs()),
-                viewModel::skipPendingMatch);
+        testOverlay.showAdDetected(formatPosition(match.getEndMs()), () -> {
+            viewModel.skipPendingMatch();
+            testOverlay.hide();
+        });
+    }
+
+    @Override
+    public void onMatchCleared() {
+        testOverlay.hide();
     }
 
     @Override

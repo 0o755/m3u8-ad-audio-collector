@@ -29,7 +29,7 @@ final class DurationComponentStepper {
         }
     }
 
-    private static final long MIN_DURATION_MS = 2_000L;
+    private static final long MIN_DURATION_MS = 5_000L;
     private static final long INPUT_DEBOUNCE_MS = 350L;
 
     private final Handler handler = new Handler(Looper.getMainLooper());

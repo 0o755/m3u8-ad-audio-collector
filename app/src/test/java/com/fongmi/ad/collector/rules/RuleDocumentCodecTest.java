@@ -58,11 +58,17 @@ public final class RuleDocumentCodecTest {
 
     private static ProbeRule rule(String id, long durationMs) {
         List<RuleFingerprint> fingerprints = new ArrayList<>();
+        List<String> windowHashes = Arrays.asList(
+                "00000000", "ffffffff", "12345678", "87654321", "abcdef01", "10fedcba");
         for (int phase : Arrays.asList(0, 64, 128, 192)) {
-            fingerprints.add(new RuleFingerprint(phase, Arrays.asList(
-                    "00000000", "ffffffff", "12345678", "87654321", "abcdef01", "10fedcba")));
+            int windowCount = (5_000 - phase - 512) / 256 + 1;
+            List<String> hashes = new ArrayList<>();
+            for (int index = 0; index < windowCount; index++) {
+                hashes.add(windowHashes.get(index % windowHashes.size()));
+            }
+            fingerprints.add(new RuleFingerprint(phase, hashes));
         }
-        return new ProbeRule(id, durationMs, 0L, 2_000L, fingerprints,
+        return new ProbeRule(id, durationMs, 0L, 5_000L, fingerprints,
                 new RuleTest("https://example.com/video.m3u8", 12_000L));
     }
 

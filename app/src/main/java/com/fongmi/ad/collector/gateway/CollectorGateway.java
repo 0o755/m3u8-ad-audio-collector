@@ -35,7 +35,7 @@ public interface CollectorGateway extends AutoCloseable {
 
     Operation stopCapture();
 
-    Operation testRule(String ruleId);
+    Operation testRule(String ruleId, boolean automaticSkip);
 
     Operation saveRule(RuleDocument document);
 
@@ -64,6 +64,8 @@ public interface CollectorGateway extends AutoCloseable {
         void onAutomaticCapture(Operation operation, AutomaticCaptureProgress progress);
 
         void onMatch(Operation operation, Match match);
+
+        void onMatchCleared(Operation operation);
 
         void onFailure(Operation operation, Failure failure);
     }
@@ -126,6 +128,8 @@ public interface CollectorGateway extends AutoCloseable {
     }
 
     final class CaptureRange {
+        public static final long REQUIRED_ANCHOR_DURATION_MS = 5_000L;
+
         private final long adStartMs;
         private final long durationMs;
         private final long anchorOffsetMs;
@@ -133,10 +137,11 @@ public interface CollectorGateway extends AutoCloseable {
 
         public CaptureRange(long adStartMs, long durationMs, long anchorOffsetMs,
                             long anchorDurationMs) {
-            if (adStartMs < 0L || durationMs < 1_000L || anchorOffsetMs < 0L
-                    || anchorDurationMs < 2_000L || anchorDurationMs > 5_000L
+            if (adStartMs < 0L || durationMs < REQUIRED_ANCHOR_DURATION_MS
+                    || anchorOffsetMs < 0L
+                    || anchorDurationMs != REQUIRED_ANCHOR_DURATION_MS
                     || anchorOffsetMs > durationMs - anchorDurationMs) {
-                throw new IllegalArgumentException("采集范围不符合 Probe v1 约束");
+                throw new IllegalArgumentException("广告和指纹锚点必须完整覆盖 5 秒");
             }
             this.adStartMs = adStartMs;
             this.durationMs = durationMs;
