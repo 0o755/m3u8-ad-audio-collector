@@ -21,12 +21,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Collector source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           path: m3u8-ad-audio-collector
 
       - name: Checkout pinned Probe source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           repository: 0o755/m3u8-ad-audio-probe
           ref: c2542e74982c09605be16e0eb9dec556b212783a
@@ -60,13 +60,16 @@ jobs:
               exit 1
             fi
             artifact_label="$version_name"
+            apk_label="$version_name"
           else
             version_name="0.1.0-dev.${GITHUB_RUN_NUMBER}.${short_sha}"
             artifact_label="main-${GITHUB_RUN_NUMBER}-${short_sha}"
+            apk_label="continuous"
           fi
           echo "CI_VERSION_NAME=$version_name" >> "$GITHUB_ENV"
           echo "CI_VERSION_CODE=$((10000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
           echo "CI_ARTIFACT_LABEL=$artifact_label" >> "$GITHUB_ENV"
+          echo "CI_APK_LABEL=$apk_label" >> "$GITHUB_ENV"
 
       - name: Test, lint and build three ABIs
         working-directory: m3u8-ad-audio-collector
@@ -87,7 +90,7 @@ jobs:
 
           while IFS=: read -r flavor abi; do
             source_apk="m3u8-ad-audio-collector/app/build/outputs/apk/$flavor/release/app-$flavor-release.apk"
-            target_apk="release/m3u8-ad-audio-collector-$CI_ARTIFACT_LABEL-$abi.apk"
+            target_apk="release/m3u8-ad-audio-collector-$CI_APK_LABEL-$abi.apk"
             if [[ ! -f "$source_apk" ]]; then
               echo "::error title=Missing APK::$source_apk was not generated"
               exit 1
@@ -109,6 +112,31 @@ jobs:
           path: release/*
           if-no-files-found: error
           retention-days: 30
+
+      - name: Move continuous release tag
+        if: github.ref == 'refs/heads/main'
+        working-directory: m3u8-ad-audio-collector
+        run: |
+          git tag --force continuous "$GITHUB_SHA"
+          git push origin refs/tags/continuous --force
+
+      - name: Publish continuous release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: continuous
+          name: Collector Continuous Build
+          body: |
+            由 main 分支最新提交自动构建。三个 APK 使用固定公开测试签名，可在后续构建中直接覆盖安装。
+
+            Source commit: ${{ github.sha }}
+          prerelease: true
+          make_latest: false
+          overwrite_files: true
+          fail_on_unmatched_files: true
+          files: release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish tag release
         if: startsWith(github.ref, 'refs/tags/')

@@ -64,13 +64,16 @@ cd /z/github/m3u8-ad-audio-collector
 
 每次推送 `main` 都会触发 `.github/workflows/release-apk.yml`。工作流固定检出已验证的
 Probe 源码，执行单元测试和 Release lint，再构建、签名并验签以下三个独立 APK；产物与
-`SHA256SUMS.txt` 会保存为该次 GitHub Actions 运行的 artifact：
+`SHA256SUMS.txt` 会同时保存为该次 GitHub Actions 运行的 artifact，并覆盖 Releases 页面
+中固定的 `Collector Continuous Build` 预发布版：
 
 - `arm64-v8a`：当前主流 64 位 ARM 手机和电视盒子。
 - `armeabi-v7a`：32 位 ARM 设备。
 - `x86_64`：64 位 x86 模拟器或设备。
 
-推送 `v*` 版本 tag 会执行同一套验证，并额外把产物上传到对应 GitHub Release。仓库内的
+持续构建使用固定 `continuous` tag 和稳定文件名，因此 Releases 页面只保留一条最新自动
+构建，不会为每个提交堆积版本。推送 `v*` 版本 tag 会执行同一套验证，并额外创建对应的
+独立版本 Release。仓库内的
 `signing/collector-test.jks` 是固定的公开测试签名，Gradle Release 构建始终使用它，因而
 连续自动构建的 APK 可以直接覆盖安装。该密钥没有保密性，只适用于当前测试应用，不能
 作为其他应用的生产签名。设备若安装过其他签名来源的同包名 APK，首次切换时仍需卸载
