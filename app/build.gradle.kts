@@ -3,16 +3,46 @@ plugins {
     id("com.android.application")
 }
 
+// CI 从发布 tag 注入版本；本地构建保留稳定的开发版本。
+val ciVersionCode = providers.gradleProperty("ciVersionCode").orNull?.toIntOrNull() ?: 1
+val ciVersionName = providers.gradleProperty("ciVersionName").orNull
+    ?.trim()
+    ?.takeIf(String::isNotEmpty)
+    ?: "0.1.0"
+
 android {
     namespace = "com.fongmi.ad.collector"
     compileSdk = 35
+
+    flavorDimensions += "abi"
+    productFlavors {
+        // 三个发布变体分别保留对应 ABI 的原生依赖，便于按设备下载。
+        create("arm64_v8a") {
+            dimension = "abi"
+            ndk {
+                abiFilters += "arm64-v8a"
+            }
+        }
+        create("armeabi_v7a") {
+            dimension = "abi"
+            ndk {
+                abiFilters += "armeabi-v7a"
+            }
+        }
+        create("x86_64") {
+            dimension = "abi"
+            ndk {
+                abiFilters += "x86_64"
+            }
+        }
+    }
 
     defaultConfig {
         applicationId = "com.fongmi.ad.collector"
         minSdk = 23
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = ciVersionCode
+        versionName = ciVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

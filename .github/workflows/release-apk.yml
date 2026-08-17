@@ -1,0 +1,133 @@
+# 版本 tag 发布：联编固定 Probe 源码，签名三个 ABI APK 并上传到对应 GitHub Release。
+name: Build and release APKs
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: collector-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Collector tag
+        uses: actions/checkout@v4
+        with:
+          path: m3u8-ad-audio-collector
+
+      - name: Checkout pinned Probe source
+        uses: actions/checkout@v4
+        with:
+          repository: 0o755/m3u8-ad-audio-probe
+          ref: c2542e74982c09605be16e0eb9dec556b212783a
+          path: m3u8-ad-audio-probe
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+          cache-dependency-path: |
+            m3u8-ad-audio-collector/**/*.gradle.kts
+            m3u8-ad-audio-collector/gradle/wrapper/gradle-wrapper.properties
+            m3u8-ad-audio-probe/**/*.gradle.kts
+            m3u8-ad-audio-probe/gradle/wrapper/gradle-wrapper.properties
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android build tools
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Resolve tag version
+        run: |
+          version_name="${GITHUB_REF_NAME#v}"
+          if [[ ! "$version_name" =~ ^[0-9]+([.][0-9]+){1,3}([-+][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error title=Invalid release tag::Tag must look like v0.1.0"
+            exit 1
+          fi
+          echo "CI_VERSION_NAME=$version_name" >> "$GITHUB_ENV"
+          echo "CI_VERSION_CODE=$((10000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+
+      - name: Test, lint and build three ABIs
+        working-directory: m3u8-ad-audio-collector
+        run: |
+          ./gradlew \
+            :app:testArm64_v8aDebugUnitTest \
+            :app:lintArm64_v8aRelease \
+            :app:assembleArm64_v8aRelease \
+            :app:assembleArmeabi_v7aRelease \
+            :app:assembleX86_64Release \
+            -PciVersionCode="$CI_VERSION_CODE" \
+            -PciVersionName="$CI_VERSION_NAME" \
+            --stacktrace --no-daemon
+
+      - name: Sign and verify APKs
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          for variable in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [[ -z "${!variable}" ]]; then
+              echo "::error title=Missing signing secret::$variable is not configured"
+              exit 1
+            fi
+          done
+
+          umask 077
+          keystore="$RUNNER_TEMP/collector-release.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$keystore"
+          mkdir -p release
+
+          while IFS=: read -r flavor abi; do
+            unsigned="m3u8-ad-audio-collector/app/build/outputs/apk/$flavor/release/app-$flavor-release-unsigned.apk"
+            signed="release/m3u8-ad-audio-collector-$CI_VERSION_NAME-$abi.apk"
+            if [[ ! -f "$unsigned" ]]; then
+              echo "::error title=Missing APK::$unsigned was not generated"
+              exit 1
+            fi
+            "$ANDROID_SDK_ROOT/build-tools/35.0.0/apksigner" sign \
+              --ks "$keystore" \
+              --ks-key-alias "$ANDROID_KEY_ALIAS" \
+              --ks-pass env:ANDROID_KEYSTORE_PASSWORD \
+              --key-pass env:ANDROID_KEY_PASSWORD \
+              --v4-signing-enabled false \
+              --out "$signed" \
+              "$unsigned"
+            "$ANDROID_SDK_ROOT/build-tools/35.0.0/apksigner" verify --verbose "$signed"
+          done <<'EOF'
+          arm64_v8a:arm64-v8a
+          armeabi_v7a:armeabi-v7a
+          x86_64:x86_64
+          EOF
+
+          sha256sum release/*.apk > release/SHA256SUMS.txt
+
+      - name: Upload workflow artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: m3u8-ad-audio-collector-${{ github.ref_name }}
+          path: release/*
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish tag release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Collector ${{ github.ref_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

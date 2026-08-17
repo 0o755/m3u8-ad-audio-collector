@@ -51,12 +51,39 @@ Maven Central 已发布。
 
 ```bash
 cd /z/github/m3u8-ad-audio-collector
-./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --no-daemon
+./gradlew :app:testArm64_v8aDebugUnitTest :app:lintArm64_v8aDebug \
+  :app:assembleArm64_v8aDebug :app:assembleArmeabi_v7aDebug \
+  :app:assembleX86_64Debug --no-daemon
 ```
 
 同级源码存在时，复合构建会把该坐标替换为默认 `:probe` 聚合模块；它传递
 `:probe-runtime`、`:probe-player`、`:probe-collector-tools`，运行时带官方
 `:probe-media3-1-9`。本项目不提供绕过正式聚合依赖图的诊断开关。
+
+## Tag 自动发布
+
+推送 `v*` 版本 tag 会触发 `.github/workflows/release-apk.yml`。工作流固定检出已验证的
+Probe 源码，同时构建、签名并验签以下三个独立 APK，然后连同 `SHA256SUMS.txt` 上传到
+该 tag 对应的 GitHub Release：
+
+- `arm64-v8a`：当前主流 64 位 ARM 手机和电视盒子。
+- `armeabi-v7a`：32 位 ARM 设备。
+- `x86_64`：64 位 x86 模拟器或设备。
+
+首次发布前需要在 GitHub 仓库的 Actions secrets 中配置：
+
+- `ANDROID_KEYSTORE_BASE64`：发布 keystore 文件的 Base64 内容。
+- `ANDROID_KEYSTORE_PASSWORD`：keystore 密码。
+- `ANDROID_KEY_ALIAS`：签名别名。
+- `ANDROID_KEY_PASSWORD`：签名私钥密码。
+
+签名材料不会写入仓库或构建日志。后续版本必须继续使用同一 keystore，才能覆盖安装。
+例如创建 `v0.1.0` 发布：
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
 
 ## 规则文件
 
