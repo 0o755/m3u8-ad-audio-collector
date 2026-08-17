@@ -8,7 +8,7 @@
 
 - 已完成独立 Android 工程、完整 UI、`CollectorGateway`、ViewModel 和回调代际隔离。
 - 已完成 Probe rules-v1 严格编解码、语义校验、稳定合并与 `RULES.JSON` 原子文件层。
-- 已基于 Probe `815d2f7` 接入 `ProbePlayer`、远端/本地规则检测、结构化错误和
+- 已基于 Probe `c2542e7` 接入 `ProbePlayer`、远端/本地规则检测、结构化错误和
   `SkipRequest`，并对 Probe session 与采集器 generation 做二次校验。
 - 已接入 `AudioFingerprintCollector`、`HlsCandidateScanner`、本地规则替换终态和指定
   单规则测试。自动扫描会逐个采集公开候选、回填起止位置并同步可见播放器，候选本身
@@ -60,24 +60,22 @@ cd /z/github/m3u8-ad-audio-collector
 `:probe-runtime`、`:probe-player`、`:probe-collector-tools`，运行时带官方
 `:probe-media3-1-9`。本项目不提供绕过正式聚合依赖图的诊断开关。
 
-## Tag 自动发布
+## 自动构建与发布
 
-推送 `v*` 版本 tag 会触发 `.github/workflows/release-apk.yml`。工作流固定检出已验证的
-Probe 源码，同时构建、签名并验签以下三个独立 APK，然后连同 `SHA256SUMS.txt` 上传到
-该 tag 对应的 GitHub Release：
+每次推送 `main` 都会触发 `.github/workflows/release-apk.yml`。工作流固定检出已验证的
+Probe 源码，执行单元测试和 Release lint，再构建、签名并验签以下三个独立 APK；产物与
+`SHA256SUMS.txt` 会保存为该次 GitHub Actions 运行的 artifact：
 
 - `arm64-v8a`：当前主流 64 位 ARM 手机和电视盒子。
 - `armeabi-v7a`：32 位 ARM 设备。
 - `x86_64`：64 位 x86 模拟器或设备。
 
-首次发布前需要在 GitHub 仓库的 Actions secrets 中配置：
+推送 `v*` 版本 tag 会执行同一套验证，并额外把产物上传到对应 GitHub Release。仓库内的
+`signing/collector-test.jks` 是固定的公开测试签名，Gradle Release 构建始终使用它，因而
+连续自动构建的 APK 可以直接覆盖安装。该密钥没有保密性，只适用于当前测试应用，不能
+作为其他应用的生产签名。设备若安装过其他签名来源的同包名 APK，首次切换时仍需卸载
+一次；之后本仓库的自动构建可以持续覆盖安装。
 
-- `ANDROID_KEYSTORE_BASE64`：发布 keystore 文件的 Base64 内容。
-- `ANDROID_KEYSTORE_PASSWORD`：keystore 密码。
-- `ANDROID_KEY_ALIAS`：签名别名。
-- `ANDROID_KEY_PASSWORD`：签名私钥密码。
-
-签名材料不会写入仓库或构建日志。后续版本必须继续使用同一 keystore，才能覆盖安装。
 例如创建 `v0.1.0` 发布：
 
 ```bash
@@ -122,5 +120,5 @@ Activity 和 ViewModel 不直接 import Probe 播放器实现，更不 import Me
 
 - 不支持直播、DRM、DASH、RTSP 或每次请求动态改变时间轴的 SSAI。
 - 线上 rules-v1 当前是空规则集，尚无可验证的真实命中。
-- Collector 尚未完成 API 23/35 真机和 Surface 生命周期仪器矩阵；Probe `815d2f7` 已完成
+- Collector 尚未完成 API 23/35 真机和 Surface 生命周期仪器矩阵；Probe `c2542e7` 已完成
   API 29 的 AAC-TS、fMP4、MP4、纯音频及无音轨样片验证。

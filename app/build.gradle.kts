@@ -47,6 +47,22 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        // 公开测试签名固定随仓库发布，保证自动构建的 APK 可以相互覆盖安装。
+        create("release") {
+            storeFile = rootProject.file("signing/collector-test.jks")
+            storePassword = "m3u8-ad-audio-collector"
+            keyAlias = "collector-test"
+            keyPassword = "m3u8-ad-audio-collector"
+        }
+    }
+
+    buildTypes {
+        getByName("release") {
+            signingConfig = signingConfigs.getByName("release")
+        }
+    }
+
     buildFeatures {
         viewBinding = false
     }

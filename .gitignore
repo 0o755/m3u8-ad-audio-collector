@@ -6,4 +6,6 @@ local.properties
 *.iml
 *.jks
 *.keystore
+!signing/
+!signing/collector-test.jks
 release/
