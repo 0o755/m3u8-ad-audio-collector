@@ -8,11 +8,13 @@
 
 - 已完成独立 Android 工程、参考 UI、`CollectorGateway`、ViewModel 和回调代际隔离。
 - 已完成 Probe rules-v1 严格编解码、语义校验、稳定合并与 `RULES.JSON` 原子文件层。
-- 已基于 Probe `4179e5e` 接入 `ProbePlayer`、远端/本地规则检测、结构化错误和
+- 已基于 Probe `fb0a83e` 接入 `ProbePlayer`、远端/本地规则检测、结构化错误和
   `SkipRequest`，并对 Probe session 与采集器 generation 做二次校验。
 - 已接入 `AudioFingerprintCollector`、`HlsCandidateScanner`、本地规则替换终态和指定
   单规则测试。自动扫描会逐个采集公开候选、回填起止位置并同步可见播放器，候选本身
   不视为已确认广告。
+- 指纹始终完整覆盖 5000ms；HLS 的短 PCM 缺口由 Probe 官方适配器有界处理，采集器不
+  读取 PCM，也不实现额外补帧或 matcher。
 - 线上规则使用 `https://raw.githubusercontent.com/0o755/m3u8-ad-audio-probe/rules/rules.json`。
   当前文档合同合法但规则数为 0，必须由采集器生成并合并真实规则后才可能命中。
 
@@ -96,4 +98,5 @@ Activity 和 ViewModel 不直接 import Probe 播放器实现，更不 import Me
 
 - 不支持直播、DRM、DASH、RTSP 或每次请求动态改变时间轴的 SSAI。
 - 线上 rules-v1 当前是空规则集，尚无可验证的真实命中。
-- 尚未完成 API 23/29/35 真机 AAC-TS、fMP4、MP4 和 Surface/codec 仪器矩阵。
+- Collector 尚未完成 API 23/35 真机和 Surface 生命周期仪器矩阵；Probe `fb0a83e` 已完成
+  API 29 的 AAC-TS、fMP4、MP4、纯音频及无音轨样片验证。

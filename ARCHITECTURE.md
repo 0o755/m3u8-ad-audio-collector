@@ -84,6 +84,6 @@ Probe 新 session 由会话门闩接管，防止命中被旧 sessionId 校验误
 
 ## Probe 公共边界
 
-Probe `d4109b5` 的默认聚合模块提供 runtime、player、collector-tools，并通过
+Probe `fb0a83e` 的默认聚合模块提供 runtime、player、collector-tools，并通过
 ServiceLoader 使用官方 Media3 1.9.2 adapter。采集器只调用公开门面，不接触 adapter PCM、
 matcher、Claim 或任何 `internal` 类型。第三方实现只能通过公开音频/播放 SPI Builder 注入。
