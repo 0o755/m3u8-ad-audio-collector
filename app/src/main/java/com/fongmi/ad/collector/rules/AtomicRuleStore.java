@@ -47,7 +47,8 @@ public final class AtomicRuleStore {
     }
 
     public synchronized RuleDocument load() throws IOException {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) return loadMediaStore();
+        // Android 10 仍允许在用户授权后写入公共下载目录，避开旧目录的 MediaStore 所有权冲突。
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) return loadMediaStore();
         recoverLegacyWrite();
         if (!target.isFile()) return RuleDocument.empty();
         return RuleDocumentCodec.fromBytes(readLimited(new FileInputStream(target)));
@@ -55,7 +56,7 @@ public final class AtomicRuleStore {
 
     public synchronized RuleDocument save(RuleDocument document) throws IOException {
         byte[] bytes = RuleDocumentCodec.toJson(document).getBytes(StandardCharsets.UTF_8);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) saveMediaStore(bytes);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) saveMediaStore(bytes);
         else saveLegacy(bytes);
         return document;
     }

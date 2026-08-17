@@ -382,12 +382,22 @@ public final class ProbeCollectorGateway implements CollectorGateway {
         if (automaticBatch.isComplete()) {
             int accepted = automaticBatch.accepted();
             int total = automaticBatch.size();
+            Failure firstFailure = automaticBatch.firstFailure();
             automaticBatch = null;
             automaticCapture = false;
             captureSessionId = 0L;
             if (accepted == 0) {
-                emitMediaFailure(operation, Failure.Code.UNSUPPORTED_SOURCE, true,
-                        "候选广告均未生成有效指纹，请改用手工截取");
+                if (firstFailure == null) {
+                    emitMediaFailure(operation, Failure.Code.UNSUPPORTED_SOURCE, true,
+                            "候选广告均未生成有效指纹，请改用手工截取");
+                } else {
+                    String detail = firstFailure.getMessage();
+                    String message = detail == null || detail.isEmpty()
+                            ? "候选广告均未生成有效指纹"
+                            : "候选广告均未生成有效指纹: " + detail;
+                    emitMediaFailure(operation, firstFailure.getCode(),
+                            firstFailure.isRetryable(), message);
+                }
             } else {
                 emitSnapshot(operation, Snapshot.State.READY,
                         "自动采集完成，已生成 " + accepted + "/" + total + " 条规则");
@@ -565,7 +575,7 @@ public final class ProbeCollectorGateway implements CollectorGateway {
     private void handleCaptureFailure(Operation operation, Failure failure) {
         captureSessionId = 0L;
         if (automaticCapture && automaticBatch != null) {
-            automaticBatch.reject();
+            automaticBatch.reject(failure);
             executeControl(() -> startNextAutomaticCapture(operation));
         } else {
             emitMediaFailure(operation, failure.getCode(), failure.isRetryable(),
@@ -774,10 +784,17 @@ public final class ProbeCollectorGateway implements CollectorGateway {
         @Override public void onDiscontinuity(long sessionId, long positionMs,
                 ProbePlaybackDiscontinuityReason reason) {
             if (sessionId != playerSessionId || closed) return;
-            Operation next = newMediaOperation(false);
+            Operation operation = mediaOperation;
+            if (!isCurrent(operation)) return;
             pendingMatch = null;
+            // 播放器回退和 HLS 断点仍属同一请求；用户 open/seek 已在入口更新 generation。
             probe.notifyHostDiscontinuity(positionMs);
-            emitSnapshot(next, Snapshot.State.READY, "");
+            if (snapshotState == Snapshot.State.SCANNING
+                    || snapshotState == Snapshot.State.CAPTURING) {
+                emitPlaybackProgress();
+            } else {
+                emitSnapshot(operation, Snapshot.State.READY, "");
+            }
         }
 
         @Override public void onError(long sessionId, ProbeErrorCode code,

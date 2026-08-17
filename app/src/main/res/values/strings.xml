@@ -3,6 +3,7 @@
     <string name="app_name">广告音频采集器</string>
     <string name="link_hint">粘贴 M3U8 播放链接</string>
     <string name="play">播放</string>
+    <string name="playback_seek">拖动播放进度</string>
     <string name="auto_scan">自动扫描并采集</string>
     <string name="auto_scanning">正在分析 M3U8...</string>
     <string name="use_current_position">取当前进度</string>

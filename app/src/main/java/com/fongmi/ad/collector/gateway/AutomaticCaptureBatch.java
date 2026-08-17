@@ -10,6 +10,7 @@ final class AutomaticCaptureBatch {
     private final List<HlsAdCandidate> candidates;
     private int index;
     private int accepted;
+    private CollectorGateway.Failure firstFailure;
 
     AutomaticCaptureBatch(HlsScanResult result) {
         candidates = result.getCandidates();
@@ -31,6 +32,10 @@ final class AutomaticCaptureBatch {
         return accepted;
     }
 
+    CollectorGateway.Failure firstFailure() {
+        return firstFailure;
+    }
+
     boolean isComplete() {
         return index >= candidates.size();
     }
@@ -40,7 +45,8 @@ final class AutomaticCaptureBatch {
         index++;
     }
 
-    void reject() {
+    void reject(CollectorGateway.Failure failure) {
+        if (firstFailure == null) firstFailure = failure;
         index++;
     }
 }

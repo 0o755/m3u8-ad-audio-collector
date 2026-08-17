@@ -10,7 +10,9 @@ import android.widget.Button;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ImageButton;
+import android.widget.SeekBar;
 import android.widget.TextView;
+import android.widget.Toast;
 import android.view.TextureView;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -34,6 +36,7 @@ import java.util.Locale;
 public final class MainActivity extends AppCompatActivity implements CollectorViewModel.Observer {
     private CollectorViewModel viewModel;
     private VideoSurfaceController videoSurfaceController;
+    private PlaybackSeekController playbackSeekController;
     private AdBoundaryEditor boundaryEditor;
     private RuleTestOverlay testOverlay;
     private ActivityResultLauncher<String[]> importLauncher;
@@ -102,6 +105,11 @@ public final class MainActivity extends AppCompatActivity implements CollectorVi
         autoSkipCheckBox = findViewById(R.id.autoSkipCheckBox);
         statusText = findViewById(R.id.statusText);
         playerTimeText = findViewById(R.id.playerTimeText);
+        playbackSeekController = new PlaybackSeekController(
+                (SeekBar) findViewById(R.id.playbackSeekBar), playerTimeText,
+                positionMs -> {
+                    if (viewModel != null) viewModel.seek(positionMs);
+                });
         ruleText = findViewById(R.id.ruleText);
         ruleCountText = findViewById(R.id.confirmedRuleCountText);
         rulePathText = findViewById(R.id.rulePathText);
@@ -180,8 +188,8 @@ public final class MainActivity extends AppCompatActivity implements CollectorVi
     @Override
     public void onState(CollectorUiState state) {
         statusText.setText(state.getStatus());
-        playerTimeText.setText(formatPosition(state.getPositionMs()) + " / "
-                + (state.getMediaDurationMs() > 0L ? formatPosition(state.getMediaDurationMs()) : "--:--"));
+        playbackSeekController.render(state.getPositionMs(), state.getMediaDurationMs(),
+                state.isMediaReady());
         int count = state.getDocument().getRules().size();
         ruleCountText.setText(getString(R.string.confirmed_rule_count, count));
         savedRulesButton.setEnabled(count > 0);
@@ -222,6 +230,9 @@ public final class MainActivity extends AppCompatActivity implements CollectorVi
     @Override
     public void onFailure(CollectorGateway.Failure failure) {
         testOverlay.hide();
+        String message = failure == null ? "操作失败" : failure.getMessage();
+        Toast.makeText(this, message == null || message.isEmpty() ? "操作失败" : message,
+                Toast.LENGTH_LONG).show();
     }
 
     private void showRuleList() {
@@ -258,7 +269,8 @@ public final class MainActivity extends AppCompatActivity implements CollectorVi
     }
 
     private void requestLegacyStoragePermission() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) return;
+        // API29 使用公共下载目录原子写入，必须先获得旧版存储授权。
+        if (Build.VERSION.SDK_INT > Build.VERSION_CODES.Q) return;
         if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 != PackageManager.PERMISSION_GRANTED) {
             storagePermissionLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE);
@@ -278,6 +290,7 @@ public final class MainActivity extends AppCompatActivity implements CollectorVi
 
     @Override
     protected void onDestroy() {
+        if (playbackSeekController != null) playbackSeekController.close();
         if (boundaryEditor != null) boundaryEditor.close();
         CollectorViewModel closing = viewModel;
         viewModel = null;

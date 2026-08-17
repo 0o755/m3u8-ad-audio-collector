@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 30dp 播放滑块提供明确的抓取目标，并与规则成功色保持一致。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <size
+        android:width="30dp"
+        android:height="30dp" />
+    <solid android:color="#FFFFFFFF" />
+    <stroke
+        android:width="4dp"
+        android:color="@color/confirmed_success" />
+</shape>

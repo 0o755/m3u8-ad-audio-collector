@@ -31,7 +31,7 @@
                 android:layout_height="wrap_content"
                 android:layout_gravity="bottom|start"
                 android:layout_marginStart="8dp"
-                android:layout_marginBottom="28dp"
+                android:layout_marginBottom="42dp"
                 android:shadowColor="#CC000000"
                 android:shadowDx="1"
                 android:shadowDy="1"
@@ -40,6 +40,22 @@
                 android:textColor="#FFFFFFFF"
                 android:textSize="12sp"
                 android:textStyle="bold" />
+
+            <SeekBar
+                android:id="@+id/playbackSeekBar"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_gravity="bottom"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
+                android:contentDescription="@string/playback_seek"
+                android:enabled="false"
+                android:max="1"
+                android:paddingStart="8dp"
+                android:paddingEnd="8dp"
+                android:progressDrawable="@drawable/playback_seek_progress"
+                android:splitTrack="false"
+                android:thumb="@drawable/playback_seek_thumb" />
 
             <LinearLayout
                 android:id="@+id/testOverlay"
