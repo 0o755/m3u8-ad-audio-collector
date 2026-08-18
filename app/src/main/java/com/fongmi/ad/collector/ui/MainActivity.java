@@ -1,4 +1,4 @@
-/* Probe v1 采集器主界面：保留参考流程，所有底层操作统一交给 ViewModel/Gateway。 */
+/* Probe v1 采集器主界面：统一组织播放、采集、测试和规则保存操作。 */
 package com.fongmi.ad.collector.ui;
 
 import android.Manifest;
@@ -51,6 +51,11 @@ public final class MainActivity extends AppCompatActivity implements CollectorVi
     private CheckBox autoSkipCheckBox;
     private TextView statusText;
     private TextView playerTimeText;
+    private TextView seekBackOneButton;
+    private TextView seekBackFiveButton;
+    private TextView playbackToggleButton;
+    private TextView seekForwardOneButton;
+    private TextView seekForwardFiveButton;
     private TextView ruleText;
     private TextView ruleCountText;
     private TextView rulePathText;
@@ -108,6 +113,11 @@ public final class MainActivity extends AppCompatActivity implements CollectorVi
         autoSkipCheckBox = findViewById(R.id.autoSkipCheckBox);
         statusText = findViewById(R.id.statusText);
         playerTimeText = findViewById(R.id.playerTimeText);
+        seekBackOneButton = findViewById(R.id.seekBackOneButton);
+        seekBackFiveButton = findViewById(R.id.seekBackFiveButton);
+        playbackToggleButton = findViewById(R.id.playbackToggleButton);
+        seekForwardOneButton = findViewById(R.id.seekForwardOneButton);
+        seekForwardFiveButton = findViewById(R.id.seekForwardFiveButton);
         playbackSeekController = new PlaybackSeekController(
                 (SeekBar) findViewById(R.id.playbackSeekBar), playerTimeText,
                 positionMs -> {
@@ -157,6 +167,11 @@ public final class MainActivity extends AppCompatActivity implements CollectorVi
             testOverlay.hide();
             viewModel.play(urlInput.getText().toString(), startMs, autoSkipCheckBox.isChecked());
         });
+        seekBackOneButton.setOnClickListener(view -> viewModel.seekBy(-1_000L));
+        seekBackFiveButton.setOnClickListener(view -> viewModel.seekBy(-5_000L));
+        playbackToggleButton.setOnClickListener(view -> viewModel.togglePlayback());
+        seekForwardOneButton.setOnClickListener(view -> viewModel.seekBy(1_000L));
+        seekForwardFiveButton.setOnClickListener(view -> viewModel.seekBy(5_000L));
         autoScanButton.setOnClickListener(view -> {
             testOverlay.hide();
             viewModel.scan(urlInput.getText().toString(), autoSkipCheckBox.isChecked());
@@ -179,7 +194,16 @@ public final class MainActivity extends AppCompatActivity implements CollectorVi
             testOverlay.showWaiting();
             viewModel.testDraft(autoSkipCheckBox.isChecked());
         });
-        confirmButton.setOnClickListener(view -> viewModel.saveDraft());
+        confirmButton.setOnClickListener(view -> {
+            CollectorViewModel.SaveDraftResult result = viewModel.saveDraft();
+            if (result == CollectorViewModel.SaveDraftResult.DUPLICATE) {
+                Toast.makeText(this, R.string.duplicate_rule_not_saved,
+                        Toast.LENGTH_LONG).show();
+            } else if (result == CollectorViewModel.SaveDraftResult.SAVING_WITH_DUPLICATES) {
+                Toast.makeText(this, R.string.duplicate_rules_ignored,
+                        Toast.LENGTH_LONG).show();
+            }
+        });
         savedRulesButton.setOnClickListener(view -> showRuleList());
         findViewById(R.id.mergeRulesButton).setOnClickListener(view ->
                 importLauncher.launch(new String[]{"application/json", "text/json", "text/plain"}));
@@ -193,6 +217,14 @@ public final class MainActivity extends AppCompatActivity implements CollectorVi
         statusText.setText(state.getStatus());
         playbackSeekController.render(state.getPositionMs(), state.getMediaDurationMs(),
                 state.isMediaReady());
+        boolean playbackControlsEnabled = state.isMediaReady();
+        seekBackOneButton.setEnabled(playbackControlsEnabled);
+        seekBackFiveButton.setEnabled(playbackControlsEnabled);
+        playbackToggleButton.setEnabled(playbackControlsEnabled);
+        seekForwardOneButton.setEnabled(playbackControlsEnabled);
+        seekForwardFiveButton.setEnabled(playbackControlsEnabled);
+        playbackToggleButton.setText(state.isPlaying()
+                ? R.string.playback_pause : R.string.playback_play);
         int count = state.getDocument().getRules().size();
         ruleCountText.setText(getString(R.string.confirmed_rule_count, count));
         savedRulesButton.setEnabled(count > 0);
@@ -201,7 +233,7 @@ public final class MainActivity extends AppCompatActivity implements CollectorVi
         ProbeRule draft = state.getDraft();
         int draftCount = state.getDraftDocument().getRules().size();
         ruleText.setText(draft == null ? "" : "规则草稿 " + draftCount
-                + " 条（未保存，可直接测试）\n"
+                + " 条（可直接测试，保存时检查重复）\n"
                 + draft.getId() + " · "
                 + String.format(Locale.US, "%.2f 秒", draft.getDurationMs() / 1000.0));
         CollectorGateway.AutomaticCaptureProgress progress =
@@ -234,8 +266,7 @@ public final class MainActivity extends AppCompatActivity implements CollectorVi
         endPreviewButton.setEnabled(state.isMediaReady());
         durationPreviewButton.setEnabled(state.isMediaReady());
         extractButton.setEnabled(state.isMediaReady());
-        testButton.setEnabled(draft != null && state.getPlaybackState()
-                != CollectorGateway.Snapshot.State.TESTING);
+        testButton.setEnabled(draft != null);
         confirmButton.setEnabled(draft != null);
         confirmButton.setText(draft == null ? getString(R.string.confirm_rule)
                 : getString(R.string.confirm_rule_count, draftCount));

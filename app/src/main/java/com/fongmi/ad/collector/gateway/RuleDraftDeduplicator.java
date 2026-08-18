@@ -48,7 +48,9 @@ final class RuleDraftDeduplicator {
         if (existingSaved != null) {
             ProbeRule updated = withId(incoming, existingSaved.getId());
             if (sameDetectionRule(existingSaved, updated)) {
-                return new Result(existingSaved, Status.ALREADY_SAVED);
+                // 重复规则仍保留本次采集的测试链接和位置，保存阶段再提示重复。
+                drafts.put(updated.getId(), updated);
+                return new Result(updated, Status.ALREADY_SAVED);
             }
             drafts.put(updated.getId(), updated);
             return new Result(updated, Status.UPDATED);

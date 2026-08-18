@@ -1,9 +1,15 @@
 <resources>
-    <!-- 用户可见文案与参考 APK 保持一致，规则内容切换为 Probe rules-v1。 -->
+    <!-- 用户可见文案覆盖播放、采集、测试和 Probe rules-v1 规则管理。 -->
     <string name="app_name">广告音频采集器</string>
     <string name="link_hint">粘贴 M3U8 播放链接</string>
     <string name="play">播放</string>
     <string name="playback_seek">拖动播放进度</string>
+    <string name="seek_back_one_second">-1秒</string>
+    <string name="seek_back_five_seconds">-5秒</string>
+    <string name="playback_pause">暂停</string>
+    <string name="playback_play">播放</string>
+    <string name="seek_forward_one_second">+1秒</string>
+    <string name="seek_forward_five_seconds">+5秒</string>
     <string name="auto_scan">自动扫描并采集</string>
     <string name="auto_scan_scanning">扫描候选...</string>
     <string name="auto_scan_capturing">采集 %1$d/%2$d · %3$d%%</string>
@@ -34,6 +40,8 @@
     <string name="test_seek_failed">已匹配广告\n结束位置 %1$s\n播放源时间轴异常，跳转失败</string>
     <string name="confirm_rule">保存规则</string>
     <string name="confirm_rule_count">保存规则（%1$d）</string>
+    <string name="duplicate_rule_not_saved">规则已存在，无需重复保存</string>
+    <string name="duplicate_rules_ignored">已忽略重复规则，正在保存其余草稿</string>
     <string name="reject_rule">规则不正确</string>
     <string name="export_rule">分享规则</string>
     <string name="ready">粘贴链接并播放，设置广告开始位置和时长后提取指纹。</string>

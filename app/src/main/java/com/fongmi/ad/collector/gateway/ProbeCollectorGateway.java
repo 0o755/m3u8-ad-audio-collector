@@ -642,11 +642,11 @@ public final class ProbeCollectorGateway implements CollectorGateway {
                                               int duplicated) {
         String prefix = "自动采集完成，已处理 " + accepted + "/" + total + " 个候选，";
         if (added == 0 && duplicated > 0) {
-            return prefix + "重复规则已合并，规则草稿 " + drafts.size() + " 条";
+            return prefix + "发现重复规则，可继续测试，保存时会提示重复";
         }
         if (duplicated > 0) {
-            return prefix + "新增 " + added + " 条、合并重复 " + duplicated
-                    + " 条，规则草稿 " + drafts.size() + " 条";
+            return prefix + "新增 " + added + " 条、重复 " + duplicated
+                    + " 条，均可继续测试";
         }
         return prefix + "规则草稿 " + drafts.size() + " 条";
     }
@@ -689,7 +689,7 @@ public final class ProbeCollectorGateway implements CollectorGateway {
         snapshotMessage = message;
         emitCurrent(operation, () -> listener.onSnapshot(operation,
                 new Snapshot(state, player.getCurrentPositionMs(), player.getDurationMs(),
-                        rules.getRules().size(), message)));
+                        rules.getRules().size(), player.isPlaying(), message)));
     }
 
     private void emitPlaybackProgress() {
@@ -945,14 +945,15 @@ public final class ProbeCollectorGateway implements CollectorGateway {
                 ProbeRule rule = ProbeDraftMapper.toRule(draft);
                 RuleDraftDeduplicator.Result result =
                         RuleDraftDeduplicator.collect(drafts, rules, rule);
-                if (result.isPending()) emitDraft(operation, result.rule());
+                // 每次完整采集都可反复测试，是否重复只影响后续保存。
+                emitDraft(operation, result.rule());
                 if (automaticCapture && automaticBatch != null) {
                     finishAutomaticPlayback();
                     automaticBatch.accept(result.status());
                     startNextAutomaticCapture(operation);
                 } else if (!result.isPending()) {
                     emitSnapshot(operation, Snapshot.State.READY,
-                            "已存在相同规则，无需重复保存");
+                            "指纹提取完成，可重复测试；保存时会提示重复规则");
                 } else {
                     emitSnapshot(operation, Snapshot.State.READY,
                             "广告指纹提取完成，可先测试，确认后保存");

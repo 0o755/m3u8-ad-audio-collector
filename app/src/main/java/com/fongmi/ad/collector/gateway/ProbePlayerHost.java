@@ -79,6 +79,10 @@ final class ProbePlayerHost implements AutoCloseable {
         return Math.max(0L, player.getDurationMs());
     }
 
+    boolean isPlaying() {
+        return player.isPlaying();
+    }
+
     void stop() {
         player.stop();
     }

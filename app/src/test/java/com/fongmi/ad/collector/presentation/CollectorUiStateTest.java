@@ -3,6 +3,7 @@ package com.fongmi.ad.collector.presentation;
 
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
+import static org.junit.Assert.assertTrue;
 
 import com.fongmi.ad.collector.gateway.CollectorGateway;
 
@@ -18,10 +19,11 @@ public final class CollectorUiStateTest {
 
         CollectorUiState state = CollectorUiState.initial()
                 .withAutomaticCapture(progress)
-                .withPlayback(343_000L, 1_385_172L, "采集中", false,
+                .withPlayback(343_000L, 1_385_172L, "采集中", false, true,
                         CollectorGateway.Snapshot.State.SCANNING);
 
         assertSame(progress, state.getAutomaticCaptureProgress());
+        assertTrue(state.isPlaying());
     }
 
     @Test
@@ -33,7 +35,7 @@ public final class CollectorUiStateTest {
 
         CollectorUiState state = CollectorUiState.initial()
                 .withAutomaticCapture(progress)
-                .withPlayback(357_132L, 1_385_172L, "采集完成", true,
+                .withPlayback(357_132L, 1_385_172L, "采集完成", true, false,
                         CollectorGateway.Snapshot.State.READY);
 
         assertNull(state.getAutomaticCaptureProgress());

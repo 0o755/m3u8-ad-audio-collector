@@ -164,13 +164,16 @@ public interface CollectorGateway extends AutoCloseable {
         private final long positionMs;
         private final long durationMs;
         private final int ruleCount;
+        private final boolean playing;
         private final String message;
 
-        public Snapshot(State state, long positionMs, long durationMs, int ruleCount, String message) {
+        public Snapshot(State state, long positionMs, long durationMs, int ruleCount,
+                        boolean playing, String message) {
             this.state = state;
             this.positionMs = Math.max(0L, positionMs);
             this.durationMs = Math.max(0L, durationMs);
             this.ruleCount = Math.max(0, ruleCount);
+            this.playing = playing;
             this.message = message == null ? "" : message;
         }
 
@@ -178,6 +181,7 @@ public interface CollectorGateway extends AutoCloseable {
         public long getPositionMs() { return positionMs; }
         public long getDurationMs() { return durationMs; }
         public int getRuleCount() { return ruleCount; }
+        public boolean isPlaying() { return playing; }
         public String getMessage() { return message; }
     }
 

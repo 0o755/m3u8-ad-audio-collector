@@ -7,10 +7,13 @@ import com.fongmi.ad.collector.gateway.CollectorGateway;
 import com.fongmi.ad.collector.rules.ProbeRule;
 import com.fongmi.ad.collector.rules.RuleDocument;
 import com.fongmi.ad.collector.rules.RuleDocumentMerger;
+import com.fongmi.ad.collector.rules.RuleDraftSavePlanner;
 
 import java.util.Collections;
 
 public final class CollectorViewModel implements CollectorGateway.Listener, AutoCloseable {
+    public enum SaveDraftResult { NO_DRAFT, DUPLICATE, SAVING, SAVING_WITH_DUPLICATES }
+
     public interface Observer {
         void onState(CollectorUiState state);
         void onMatch(CollectorGateway.Match match);
@@ -60,6 +63,21 @@ public final class CollectorViewModel implements CollectorGateway.Listener, Auto
         gateway.seek(Math.max(0L, positionMs));
     }
 
+    public void seekBy(long offsetMs) {
+        long target = state.getPositionMs() + offsetMs;
+        if (target < 0L) target = 0L;
+        if (state.getMediaDurationMs() > 0L) {
+            target = Math.min(target, state.getMediaDurationMs());
+        }
+        seek(target);
+    }
+
+    public void togglePlayback() {
+        previewEndMs = -1L;
+        if (state.isPlaying()) gateway.pause();
+        else gateway.play();
+    }
+
     public void previewPosition(long positionMs) {
         previewEndMs = -1L;
         gateway.seek(Math.max(0L, positionMs));
@@ -95,14 +113,23 @@ public final class CollectorViewModel implements CollectorGateway.Listener, Auto
         }
     }
 
-    public void saveDraft() {
+    public SaveDraftResult saveDraft() {
         ProbeRule draft = state.getDraft();
-        if (draft == null) return;
+        if (draft == null) return SaveDraftResult.NO_DRAFT;
         try {
+            RuleDraftSavePlanner.Result plan = RuleDraftSavePlanner.plan(
+                    state.getDocument(), state.getDraftDocument());
+            if (plan.getPending().getRules().isEmpty()) {
+                update(state.withStatus("规则已存在，无需重复保存"));
+                return SaveDraftResult.DUPLICATE;
+            }
             gateway.saveRule(RuleDocumentMerger.merge(state.getDocument(),
-                    state.getDraftDocument()));
+                    plan.getPending()));
+            return plan.getDuplicateCount() > 0
+                    ? SaveDraftResult.SAVING_WITH_DUPLICATES : SaveDraftResult.SAVING;
         } catch (IllegalArgumentException error) {
             update(state.withStatus("规则无法保存: " + error.getMessage()));
+            return SaveDraftResult.NO_DRAFT;
         }
     }
 
@@ -132,7 +159,7 @@ public final class CollectorViewModel implements CollectorGateway.Listener, Auto
         boolean ready = snapshot.getState() == CollectorGateway.Snapshot.State.READY
                 || snapshot.getState() == CollectorGateway.Snapshot.State.BUFFERING;
         update(state.withPlayback(snapshot.getPositionMs(), snapshot.getDurationMs(),
-                snapshot.getMessage(), ready, snapshot.getState()));
+                snapshot.getMessage(), ready, snapshot.isPlaying(), snapshot.getState()));
     }
 
     @Override

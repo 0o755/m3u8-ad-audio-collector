@@ -1,4 +1,4 @@
-/* 验证重复指纹复用稳定规则 ID，不把重复自动扫描累加为新草稿。 */
+/* 验证重复指纹复用稳定规则 ID，并保留本次采集结果供重复测试。 */
 package com.fongmi.ad.collector.gateway;
 
 import static org.junit.Assert.assertEquals;
@@ -33,7 +33,7 @@ public final class RuleDraftDeduplicatorTest {
     }
 
     @Test
-    public void identicalSavedRuleDoesNotCreatePendingDraft() {
+    public void identicalSavedRuleRemainsAvailableForTesting() {
         Map<String, ProbeRule> drafts = new LinkedHashMap<>();
         ProbeRule saved = rule("saved-rule", 15_000L, "11111111");
 
@@ -42,7 +42,9 @@ public final class RuleDraftDeduplicatorTest {
                 rule("new-id", 15_000L, "11111111"));
 
         assertEquals(RuleDraftDeduplicator.Status.ALREADY_SAVED, result.status());
-        assertTrue(drafts.isEmpty());
+        assertEquals(1, drafts.size());
+        assertTrue(drafts.containsKey("saved-rule"));
+        assertEquals("saved-rule", result.rule().getId());
     }
 
     @Test

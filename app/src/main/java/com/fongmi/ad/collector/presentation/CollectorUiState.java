@@ -17,11 +17,13 @@ public final class CollectorUiState {
     private final RuleDocument document;
     private final RuleDocument draftDocument;
     private final boolean mediaReady;
+    private final boolean playing;
     private final CollectorGateway.Snapshot.State playbackState;
     private final CollectorGateway.AutomaticCaptureProgress automaticCaptureProgress;
 
     CollectorUiState(long positionMs, long mediaDurationMs, String status, String rulePath,
                      RuleDocument document, RuleDocument draftDocument, boolean mediaReady,
+                     boolean playing,
                      CollectorGateway.Snapshot.State playbackState,
                      CollectorGateway.AutomaticCaptureProgress automaticCaptureProgress) {
         this.positionMs = positionMs;
@@ -31,6 +33,7 @@ public final class CollectorUiState {
         this.document = document;
         this.draftDocument = draftDocument;
         this.mediaReady = mediaReady;
+        this.playing = playing;
         this.playbackState = playbackState;
         this.automaticCaptureProgress = automaticCaptureProgress;
     }
@@ -38,17 +41,18 @@ public final class CollectorUiState {
     static CollectorUiState initial() {
         return new CollectorUiState(0L, 0L,
                 "粘贴链接并播放，设置广告开始位置和时长后提取指纹。",
-                "", RuleDocument.empty(), RuleDocument.empty(), false,
+                "", RuleDocument.empty(), RuleDocument.empty(), false, false,
                 CollectorGateway.Snapshot.State.IDLE, null);
     }
 
     CollectorUiState withPlayback(long positionMs, long durationMs, String status,
-                                  boolean ready, CollectorGateway.Snapshot.State playbackState) {
+                                  boolean ready, boolean playing,
+                                  CollectorGateway.Snapshot.State playbackState) {
         CollectorGateway.AutomaticCaptureProgress progress =
                 playbackState == CollectorGateway.Snapshot.State.SCANNING
                         ? automaticCaptureProgress : null;
         return new CollectorUiState(positionMs, durationMs, status, rulePath,
-                document, draftDocument, ready, playbackState, progress);
+                document, draftDocument, ready, playing, playbackState, progress);
     }
 
     CollectorUiState withRules(RuleDocument document, String path, String status) {
@@ -58,7 +62,7 @@ public final class CollectorUiState {
         }
         return new CollectorUiState(positionMs, mediaDurationMs, status, path,
                 document, new RuleDocument(draftDocument.getRevision(),
-                new ArrayList<>(remaining.values())), mediaReady, playbackState,
+                new ArrayList<>(remaining.values())), mediaReady, playing, playbackState,
                 automaticCaptureProgress);
     }
 
@@ -68,19 +72,20 @@ public final class CollectorUiState {
         combined.put(draft.getId(), draft);
         return new CollectorUiState(positionMs, mediaDurationMs, status, rulePath,
                 document, new RuleDocument(draftDocument.getRevision(),
-                new ArrayList<>(combined.values())), mediaReady, playbackState,
+                new ArrayList<>(combined.values())), mediaReady, playing, playbackState,
                 automaticCaptureProgress);
     }
 
     CollectorUiState withStatus(String status) {
         return new CollectorUiState(positionMs, mediaDurationMs, status, rulePath,
-                document, draftDocument, mediaReady, playbackState, automaticCaptureProgress);
+                document, draftDocument, mediaReady, playing, playbackState,
+                automaticCaptureProgress);
     }
 
     CollectorUiState withAutomaticCapture(
             CollectorGateway.AutomaticCaptureProgress progress) {
         return new CollectorUiState(positionMs, mediaDurationMs, status, rulePath,
-                document, draftDocument, mediaReady, playbackState, progress);
+                document, draftDocument, mediaReady, playing, playbackState, progress);
     }
 
     public long getPositionMs() { return positionMs; }
@@ -94,6 +99,7 @@ public final class CollectorUiState {
     }
     public RuleDocument getDraftDocument() { return draftDocument; }
     public boolean isMediaReady() { return mediaReady; }
+    public boolean isPlaying() { return playing; }
     public CollectorGateway.Snapshot.State getPlaybackState() { return playbackState; }
     public CollectorGateway.AutomaticCaptureProgress getAutomaticCaptureProgress() {
         return automaticCaptureProgress;
